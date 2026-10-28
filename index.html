@@ -359,6 +359,40 @@ let vozDisponible = null;
 let temporizadorMensaje = null;
 let temporizadorLiberacion = null;
 let ultimoCodigo = '';
+let ventanaEnlacesQR = null;
+
+/* Prepara una pestaña desde el toque del usuario para abrir los enlaces QR. */
+function prepararVentanaEnlacesQR() {
+  try {
+    if (!ventanaEnlacesQR || ventanaEnlacesQR.closed) {
+      ventanaEnlacesQR = window.open('about:blank', 'ventanaEnlacesQR');
+    }
+    if (ventanaEnlacesQR) {
+      ventanaEnlacesQR.document.title = 'Audio del código QR';
+      window.focus();
+    }
+  } catch (e) {
+    console.warn('No se pudo preparar la pestaña de enlaces QR:', e);
+  }
+}
+
+/* Abre el enlace del QR en la pestaña preparada, sin detener el lector. */
+function abrirEnlaceQR(texto) {
+  const enlace = String(texto || '').trim();
+  if (!/^https?:\/\//i.test(enlace)) return;
+
+  try {
+    if (!ventanaEnlacesQR || ventanaEnlacesQR.closed) {
+      ventanaEnlacesQR = window.open('about:blank', 'ventanaEnlacesQR');
+    }
+    if (ventanaEnlacesQR) {
+      ventanaEnlacesQR.location.href = enlace;
+      window.focus();
+    }
+  } catch (e) {
+    console.warn('No se pudo abrir el enlace del QR:', e);
+  }
+}
 
 /*
  * Registros realizados durante esta sesión.
@@ -474,6 +508,9 @@ function procesarQR(textoQR) {
 
   codigoEnLectura = codigo;
   programarLiberacion(codigo);
+
+  /* Si el QR contiene un enlace web, abrirlo en la pestaña de fondo. */
+  abrirEnlaceQR(codigo);
 
   total++;
   actualizarContador();
@@ -654,6 +691,8 @@ async function alternarLinterna() {
 /* Activación inicial mediante interacción del usuario. */
 $('btnIniciar').addEventListener('click', async () => {
   if (activo || iniciando) return;
+
+  prepararVentanaEnlacesQR();
 
   hablar(
     'Escáner activado. Puede comenzar a registrar asistencias.'
