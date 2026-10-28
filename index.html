@@ -3,35 +3,28 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1769aa">
   <title>Escáner QR - Modo Profesor</title>
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
-      font-family: Arial, sans-serif;
-      text-align: center;
       margin: 0;
-      padding: 18px 12px;
-      background: #f2f5fa;
-      color: #202938;
+      padding: 16px 12px;
+      text-align: center;
+      font-family: Arial, sans-serif;
+      background: #f1f5f9;
+      color: #1e293b;
     }
 
-    h2 {
-      font-size: 22px;
-      margin: 12px 0 20px;
-    }
+    h2 { font-size: 22px; }
 
     .panel {
-      width: 100%;
-      max-width: 520px;
+      max-width: 480px;
       margin: auto;
       padding: 18px 14px;
       background: white;
@@ -41,121 +34,74 @@
 
     button {
       width: 100%;
-      max-width: 330px;
-      padding: 14px 18px;
-      margin: 7px auto;
+      max-width: 320px;
+      padding: 14px;
       border: 0;
       border-radius: 9px;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      touch-action: manipulation;
-    }
-
-    button:disabled {
-      opacity: .6;
-    }
-
-    #btnIniciar {
       background: #1769aa;
       color: white;
-    }
-
-    #btnDetener {
-      background: #b42318;
-      color: white;
-      display: none;
-    }
-
-    #btnReintentar {
-      background: #e8a317;
-      color: #222;
-      display: none;
-    }
-
-    #estado {
-      font-size: 15px;
-      line-height: 1.5;
-      overflow-wrap: anywhere;
-    }
-
-    #msg {
-      font-size: 18px;
+      font-size: 17px;
       font-weight: bold;
-      line-height: 1.5;
-      overflow-wrap: anywhere;
+      cursor: pointer;
     }
+
+    button:disabled { opacity: .6; }
 
     #lector {
-      width: 100%;
-      max-width: 420px;
-      margin: 15px auto;
       display: none;
+      width: 100%;
+      max-width: 400px;
+      margin: 14px auto;
       overflow: hidden;
     }
 
     #lector video {
       width: 100% !important;
-      height: auto !important;
       border-radius: 10px;
-      object-fit: cover;
     }
 
-    #ultimoEnlace {
-      display: block;
-      overflow-wrap: anywhere;
-      margin: 12px 0;
-    }
-
-    .pequeno {
-      font-size: 13px;
-      color: #5b6472;
+    #estado {
+      font-size: 15px;
       line-height: 1.5;
     }
 
-    select {
-      max-width: 100%;
-      padding: 10px;
-      margin: 8px;
-      font-size: 15px;
+    #msg {
+      font-size: 19px;
+      font-weight: bold;
+      overflow-wrap: anywhere;
     }
+
+    #contador {
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    #ultimo {
+      font-size: 13px;
+      overflow-wrap: anywhere;
+      color: #64748b;
+    }
+
+    .verde { color: #16803c; }
+    .rojo { color: #b42318; }
   </style>
 </head>
 
 <body>
   <h2>📷 Escáner QR - Modo Profesor</h2>
 
-  <main class="panel">
-    <p id="estado">
-      Pulse iniciar y permita el acceso a la cámara.
-    </p>
-
-    <label for="camaras">Cámara:</label>
-    <select id="camaras" aria-label="Seleccionar cámara">
-      <option value="">Selección automática</option>
-    </select>
+  <div class="panel">
+    <p id="estado">Pulse iniciar para activar la cámara.</p>
 
     <button id="btnIniciar">🔊 Iniciar escáner</button>
-    <button id="btnDetener">⏹ Detener escáner</button>
 
     <div id="lector"></div>
 
     <p id="msg" role="status" aria-live="polite"></p>
-    <p id="contador">Enlaces leídos: 0</p>
-
-    <p class="pequeno">Último enlace leído:</p>
-    <a id="ultimoEnlace" href="#" target="_blank"
-       rel="noopener noreferrer" hidden>
-      Abrir último enlace
-    </a>
-
-    <button id="btnReintentar">🔁 Abrir enlace nuevamente</button>
-
-    <p class="pequeno">
-      Si la cámara no inicia, compruebe los permisos de Chrome
-      y que esta página se abra mediante HTTPS.
-    </p>
-  </main>
+    <p id="contador">Solicitudes iniciadas: 0</p>
+    <p id="pendientes">Pendientes: 0</p>
+    <p id="ultimo">Esperando el primer QR...</p>
+  </div>
 
 <script>
 "use strict";
@@ -164,90 +110,68 @@ const $ = id => document.getElementById(id);
 
 let lector = null;
 let iniciando = false;
-let procesando = false;
 let activo = false;
-let vozDisponible = null;
-let ultimoEnlace = "";
-let totalEnlaces = 0;
-let temporizador = null;
-let ultimaLectura = "";
-let tiempoUltimaLectura = 0;
-let listaCamaras = [];
+let procesandoQR = false;
+let voz = null;
+
+let total = 0;
+let enCurso = 0;
+let ultimoCodigo = "";
+let ultimaLectura = 0;
 
 const cola = [];
 const pendientes = new Set();
+const ultimaSolicitud = new Map();
+
+// Fecha local de Bolivia.
+function hoy() {
+  const p = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/La_Paz",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+
+  const o = Object.fromEntries(p.map(x => [x.type, x.value]));
+  return `${o.year}-${o.month}-${o.day}`;
+}
 
 function hablar(texto) {
   if (!("speechSynthesis" in window)) return;
 
   try {
-    const voces = speechSynthesis.getVoices();
-    vozDisponible =
-      voces.find(v => /^es(-|_)/i.test(v.lang)) ||
-      voces[0] || null;
-
     speechSynthesis.cancel();
 
-    const voz = new SpeechSynthesisUtterance(texto);
-    voz.lang = vozDisponible ? vozDisponible.lang : "es-ES";
-    if (vozDisponible) voz.voice = vozDisponible;
-    voz.rate = 1;
-
-    speechSynthesis.speak(voz);
+    const mensaje = new SpeechSynthesisUtterance(texto);
+    mensaje.lang = "es-ES";
+    mensaje.rate = 1;
+    speechSynthesis.speak(mensaje);
   } catch (e) {
-    console.warn("Voz no disponible:", e);
+    console.warn("Voz no disponible", e);
   }
 }
 
 function esURL(texto) {
   try {
     const u = new URL(texto);
-    return u.protocol === "https:" || u.protocol === "http:";
+
+    return (
+      (u.protocol === "https:" || u.protocol === "http:") &&
+      u.hostname === "script.google.com" &&
+      u.pathname.includes("/macros/s/") &&
+      u.pathname.endsWith("/exec")
+    );
   } catch (e) {
     return false;
   }
 }
 
-function mostrarEnlace(url) {
-  ultimoEnlace = url;
+function actualizarContador() {
+  $("contador").textContent =
+    "Solicitudes iniciadas: " + total;
 
-  $("ultimoEnlace").href = url;
-  $("ultimoEnlace").textContent = "Abrir último enlace leído";
-  $("ultimoEnlace").hidden = false;
-  $("btnReintentar").style.display = "block";
-}
-
-async function enumerarCamaras() {
-  const selector = $("camaras");
-  const valorAnterior = selector.value;
-
-  try {
-    const camaras = await Html5Qrcode.getCameras();
-    listaCamaras = camaras || [];
-
-    selector.innerHTML =
-      '<option value="">Cámara trasera automática</option>';
-
-    listaCamaras.forEach((camara, i) => {
-      const opcion = document.createElement("option");
-      opcion.value = camara.id;
-      opcion.textContent =
-        camara.label || `Cámara ${i + 1}`;
-      selector.appendChild(opcion);
-    });
-
-    if (valorAnterior &&
-        listaCamaras.some(c => c.id === valorAnterior)) {
-      selector.value = valorAnterior;
-    }
-
-    if (listaCamaras.length === 0) {
-      $("estado").textContent =
-        "No se encontraron cámaras. Compruebe los permisos.";
-    }
-  } catch (error) {
-    console.warn("No se pudieron enumerar cámaras:", error);
-  }
+  $("pendientes").textContent =
+    "Pendientes: " + (cola.length + enCurso);
 }
 
 async function iniciarEscaner() {
@@ -255,8 +179,8 @@ async function iniciarEscaner() {
 
   iniciando = true;
   $("btnIniciar").disabled = true;
+  $("estado").textContent = "Activando cámara trasera...";
   $("msg").textContent = "";
-  $("estado").textContent = "Solicitando acceso a la cámara...";
   $("lector").style.display = "block";
 
   try {
@@ -264,33 +188,23 @@ async function iniciarEscaner() {
         !navigator.mediaDevices ||
         !navigator.mediaDevices.getUserMedia) {
       throw new Error(
-        "SECURE_CONTEXT: Abra la página mediante HTTPS en Chrome."
+        "Abre el lector en Chrome mediante HTTPS."
       );
     }
 
     if (typeof Html5Qrcode === "undefined") {
       throw new Error(
-        "No se pudo cargar la biblioteca QR. Compruebe Internet."
+        "No se pudo cargar el lector QR. Comprueba Internet."
       );
     }
 
-    if (lector) {
-      await detenerEscaner();
-    }
+    lector = new Html5Qrcode("lector");
 
-    lector = new Html5Qrcode("lector", {
-      verbose: false
-    });
-
-    const camaraElegida = $("camaras").value;
-    const configuracionCamara = camaraElegida
-      ? { deviceId: { exact: camaraElegida } }
-      : { facingMode: "environment" };
-
+    // Solicita directamente la cámara trasera.
     await lector.start(
-      configuracionCamara,
+      { facingMode: { ideal: "environment" } },
       {
-        fps: 10,
+        fps: 12,
         qrbox: (ancho, alto) => {
           const lado = Math.floor(
             Math.min(ancho, alto, 260)
@@ -300,79 +214,62 @@ async function iniciarEscaner() {
         aspectRatio: 1
       },
       texto => {
-        if (procesando || !activo) return;
-
+        // Nunca se detiene la cámara para enviar una solicitud.
         const ahora = Date.now();
         const codigo = texto.trim();
 
-        // Evita múltiples eventos de un mismo QR
-        // mientras permanece delante de la cámara.
-        if (codigo === ultimaLectura &&
-            ahora - tiempoUltimaLectura < 2500) {
+        // Evita repetir el mismo QR mientras permanece frente
+        // a la cámara. Permite volver a leerlo después de 4 s.
+        if (codigo === ultimoCodigo &&
+            ahora - ultimaLectura < 4000) {
           return;
         }
 
-        ultimaLectura = codigo;
-        tiempoUltimaLectura = ahora;
-        procesando = true;
+        ultimoCodigo = codigo;
+        ultimaLectura = ahora;
 
-        procesarQR(codigo);
+        recibirQR(codigo);
       },
       () => {}
     );
 
     activo = true;
+
     $("estado").textContent =
-      "🟢 Cámara activa. Apunte al código QR.";
-    $("btnDetener").style.display = "block";
+      "🟢 Lector activo. Escanee los QR uno tras otro.";
+    $("msg").textContent = "Listo para registrar asistencia.";
+    $("msg").className = "verde";
     $("btnIniciar").style.display = "none";
 
-    // Los nombres de las cámaras suelen aparecer después
-    // de que el usuario concede permiso.
-    await enumerarCamaras();
+    hablar("Escáner activado. Puede comenzar.");
 
   } catch (error) {
+    console.error("Error al activar cámara:", error);
+
     activo = false;
-
-    const detalle = error && error.message
-      ? error.message
-      : String(error);
-
-    console.error("Error de cámara:", error);
+    $("lector").style.display = "none";
+    $("btnIniciar").style.display = "block";
 
     if (error.name === "NotAllowedError" ||
         error.name === "PermissionDeniedError") {
       $("estado").textContent =
-        "⛔ Permiso de cámara denegado. Autorice Cámara en Chrome y en Android.";
+        "Permita la cámara para este sitio en Chrome y en los ajustes de Android.";
     } else if (error.name === "NotFoundError") {
       $("estado").textContent =
         "No se encontró una cámara disponible.";
-    } else if (error.name === "NotReadableError" ||
-               error.name === "TrackStartError") {
+    } else if (error.name === "NotReadableError") {
       $("estado").textContent =
-        "La cámara está ocupada. Cierre otras aplicaciones que la utilicen.";
-    } else if (error.name === "OverconstrainedError") {
-      $("estado").textContent =
-        "La cámara seleccionada no está disponible. Pruebe selección automática.";
+        "La cámara está ocupada por otra aplicación.";
     } else {
-      $("estado").textContent = "No se pudo iniciar: " + detalle;
+      $("estado").textContent =
+        "No se pudo iniciar: " + (error.message || error);
     }
 
     if (lector) {
-      try {
-        await lector.stop();
-      } catch (e) {}
-
-      try {
-        await lector.clear();
-      } catch (e) {}
-
+      try { await lector.stop(); } catch (e) {}
+      try { await lector.clear(); } catch (e) {}
       lector = null;
     }
-
-    $("lector").style.display = "none";
-    $("btnIniciar").style.display = "block";
-    $("btnDetener").style.display = "none";
 
   } finally {
     iniciando = false;
@@ -380,128 +277,103 @@ async function iniciarEscaner() {
   }
 }
 
-async function procesarQR(codigo) {
-  try {
-    if (!codigo) return;
+function recibirQR(codigo) {
+  if (!codigo) return;
 
-    if (!esURL(codigo)) {
-      $("msg").textContent =
-        "El QR no contiene un enlace web válido.";
-      hablar("Código QR sin enlace válido");
-      return;
-    }
-
-    mostrarEnlace(codigo);
-
-    // Añadir a la cola si no está ya pendiente.
-    if (!pendientes.has(codigo)) {
-      pendientes.add(codigo);
-      cola.push(codigo);
-    }
-
-    $("msg").textContent =
-      "QR leído. Preparando apertura del enlace...";
-    hablar("Código leído");
-
-    procesarCola();
-
-  } catch (error) {
-    console.error("Error procesando QR:", error);
-    $("msg").textContent = "Error al procesar el QR.";
-  } finally {
-    clearTimeout(temporizador);
-
-    temporizador = setTimeout(() => {
-      procesando = false;
-      ultimaLectura = "";
-    }, 1500);
+  if (!esURL(codigo)) {
+    $("msg").textContent = "QR no válido para este sistema.";
+    $("msg").className = "rojo";
+    hablar("Código QR no válido");
+    return;
   }
+
+  // Si el mismo enlace ya está en la cola, no se duplica.
+  if (pendientes.has(codigo)) return;
+
+  // Evita reenvíos accidentales durante unos segundos.
+  const ultima = ultimaSolicitud.get(codigo) || 0;
+  if (Date.now() - ultima < 4000) return;
+
+  pendientes.add(codigo);
+  ultimaSolicitud.set(codigo, Date.now());
+  cola.push(codigo);
+
+  $("msg").textContent = "QR leído. Solicitud en proceso...";
+  $("msg").className = "verde";
+  $("ultimo").textContent = "Último QR: " + codigo;
+
+  actualizarContador();
+  procesarCola();
 }
 
-let procesandoCola = false;
-
 async function procesarCola() {
-  if (procesandoCola) return;
-  procesandoCola = true;
+  // Un solo consumidor de la cola; la cámara sigue activa.
+  if (procesandoQR) return;
+  procesandoQR = true;
 
   try {
     while (cola.length > 0) {
       const url = cola.shift();
 
+      enCurso++;
+      total++;
+      actualizarContador();
+
       try {
         $("estado").textContent =
-          "Abriendo enlace de Google Apps Script...";
+          "Cámara activa · Enviando asistencia en segundo plano";
 
-        // Navegación de la pestaña actual: evita depender
-        // de ventanas emergentes bloqueadas en Android.
-        $("estado").textContent =
-          "Enviando solicitud al enlace de asistencia...";
+        /*
+         * GET sin CORS: permite solicitar el endpoint externo
+         * sin abandonar la página. La respuesta es opaca:
+         * no permite confirmar si Sheets guardó la asistencia.
+         */
+        await fetch(url, {
+          method: "GET",
+          mode: "no-cors",
+          cache: "no-store",
+          redirect: "follow"
+        });
 
-        window.location.assign(url);
-
-        // La navegación abandona esta página. No existe
-        // confirmación de guardado desde este mecanismo.
-        return;
+        $("msg").textContent =
+          "Solicitud enviada al navegador. Lector listo para otro QR.";
+        $("msg").className = "verde";
 
       } catch (error) {
-        console.error("Error abriendo enlace:", error);
-        pendientes.delete(url);
-        mostrarEnlace(url);
+        console.error("Error de red:", error);
 
-        $("estado").textContent =
-          "No se pudo abrir automáticamente. Pulse el enlace para reintentar.";
-        $("msg").textContent = String(error);
+        /*
+         * Conserva el enlace para un reintento posterior.
+         * No se afirma que Google Sheets lo haya guardado.
+         */
+        cola.unshift(url);
+
+        $("msg").textContent =
+          "Sin conexión o solicitud fallida. QR conservado para reintentar.";
+        $("msg").className = "rojo";
+
+        // Evita un bucle de reintentos continuo sin conexión.
+        await new Promise(resolve => setTimeout(resolve, 2500));
+        break;
+
+      } finally {
+        enCurso--;
+        actualizarContador();
       }
     }
   } finally {
-    procesandoCola = false;
+    procesandoQR = false;
+    actualizarContador();
+
+    if (cola.length === 0) {
+      $("estado").textContent =
+        "🟢 Cámara activa · Listo para el siguiente estudiante.";
+    }
   }
-}
-
-async function detenerEscaner() {
-  activo = false;
-  clearTimeout(temporizador);
-
-  if (lector) {
-    const anterior = lector;
-    lector = null;
-
-    try {
-      await anterior.stop();
-    } catch (e) {}
-
-    try {
-      await anterior.clear();
-    } catch (e) {}
-  }
-
-  $("lector").style.display = "none";
-  $("btnDetener").style.display = "none";
-  $("btnIniciar").style.display = "block";
-  $("estado").textContent = "Escáner detenido.";
 }
 
 $("btnIniciar").addEventListener("click", iniciarEscaner);
-$("btnDetener").addEventListener("click", detenerEscaner);
-
-$("camaras").addEventListener("change", async () => {
-  if (activo) {
-    await detenerEscaner();
-    await iniciarEscaner();
-  }
-});
-
-$("btnReintentar").addEventListener("click", () => {
-  if (ultimoEnlace && esURL(ultimoEnlace)) {
-    window.location.assign(ultimoEnlace);
-  }
-});
-
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden && activo) {
-    detenerEscaner();
-  }
-});
 </script>
 </body>
 </html>
+
