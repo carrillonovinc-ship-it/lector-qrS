@@ -1,116 +1,395 @@
+
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <title>Registro de Asistencia - Modo Profesor</title>
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-  </head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+  <title>Registro de Asistencia - Modo Profesor</title>
 
-  <body style="font-family:sans-serif; text-align:center;">
-    <h2>📷 Escáner QR - Modo Profesor</h2>
+  <script src="https://unpkg.com/html5-qrcode"></script>
 
-    <!-- Botón inicial (necesario para desbloquear audio en móviles) -->
-    <button id="btnIniciar" style="padding:12px 25px; font-size:16px; margin:20px;">
-      🔊 Iniciar escáner
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 20px 12px;
+      background: #f3f6fa;
+      color: #1f2937;
+    }
+
+    h2 { font-size: 23px; }
+
+    button {
+      padding: 13px 20px;
+      margin: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      border: none;
+      border-radius: 9px;
+      cursor: pointer;
+    }
+
+    #btnIniciar { background: #1769aa; color: white; }
+    #btnReintentar { background: #e5a000; color: #111; }
+    #lector {
+      width: 100%;
+      max-width: 400px;
+      margin: 15px auto;
+      display: none;
+    }
+
+    #msg {
+      font-size: 18px;
+      font-weight: bold;
+      overflow-wrap: anywhere;
+    }
+
+    #contador {
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    #estado {
+      font-size: 14px;
+      color: #4b5563;
+    }
+
+    #ultimoEnlace {
+      display: block;
+      overflow-wrap: anywhere;
+      margin: 12px auto;
+    }
+
+    .panel {
+      max-width: 520px;
+      margin: 15px auto;
+      padding: 15px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px #00000012;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>📷 Escáner QR - Modo Profesor</h2>
+
+  <div class="panel">
+    <button id="btnIniciar">🔊 Iniciar escáner</button>
+
+    <p id="estado">Esperando para iniciar...</p>
+    <p id="msg" role="status" aria-live="polite"></p>
+    <p id="contador">Enlaces procesados: 0</p>
+
+    <div id="lector"></div>
+
+    <p>Último enlace leído:</p>
+    <a id="ultimoEnlace" href="#" target="_blank"
+       rel="noopener noreferrer" hidden>
+      Abrir último enlace
+    </a>
+
+    <button id="btnReintentar" hidden>
+      🔁 Abrir último enlace otra vez
     </button>
+  </div>
 
-    <div id="lector" style="width: 350px; margin:auto; display:none;"></div>
-    <p id="msg" style="font-size: 18px; font-weight: bold; color: green;"></p>
+<script>
+  let reader = null;
+  let iniciando = false;
+  let procesando = false;
+  let ventanaEnvio = null;
+  let vozDisponible = null;
+  let ultimoEnlace = "";
+  let totalEnlaces = 0;
+  let temporizadorReinicio = null;
 
-    <script>
-      let reader;
-      const registrosHoy = {};
-      let vozDisponible = null;
+  // Cola para no omitir enlaces por lecturas consecutivas.
+  const cola = [];
+  const codigosEnCola = new Set();
 
-      // Obtener fecha actual
-      function hoy() {
-        const d = new Date();
-        return d.toISOString().split("T")[0];
+  // Los códigos que no son URL se controlan por día.
+  let registrosHoy = cargarRegistros();
+
+  const $ = id => document.getElementById(id);
+
+  function hoy() {
+    const partes = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/La_Paz",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(new Date());
+
+    const p = Object.fromEntries(
+      partes.map(x => [x.type, x.value])
+    );
+
+    return `${p.year}-${p.month}-${p.day}`;
+  }
+
+  function cargarRegistros() {
+    try {
+      return JSON.parse(
+        localStorage.getItem("asistenciaQR_" + hoy()) || "{}"
+      );
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function guardarRegistros() {
+    try {
+      localStorage.setItem(
+        "asistenciaQR_" + hoy(),
+        JSON.stringify(registrosHoy)
+      );
+    } catch (e) {
+      console.warn("No se pudo guardar el registro local.", e);
+    }
+  }
+
+  function cargarVoz() {
+    if (!("speechSynthesis" in window)) return;
+
+    const voces = speechSynthesis.getVoices();
+    vozDisponible =
+      voces.find(v => /^es(-|_)/i.test(v.lang)) ||
+      voces[0] || null;
+  }
+
+  if ("speechSynthesis" in window) {
+    speechSynthesis.onvoiceschanged = cargarVoz;
+    cargarVoz();
+  }
+
+  function hablar(texto) {
+    if (!("speechSynthesis" in window)) return;
+
+    cargarVoz();
+
+    const mensaje = new SpeechSynthesisUtterance(texto);
+    mensaje.lang = vozDisponible?.lang || "es-ES";
+    if (vozDisponible) mensaje.voice = vozDisponible;
+    mensaje.rate = 1;
+    mensaje.pitch = 1;
+
+    speechSynthesis.cancel();
+    speechSynthesis.speak(mensaje);
+  }
+
+  function esEnlace(texto) {
+    try {
+      const u = new URL(texto);
+      return u.protocol === "https:" || u.protocol === "http:";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function mostrarEnlace(url) {
+    ultimoEnlace = url;
+
+    $("ultimoEnlace").href = url;
+    $("ultimoEnlace").textContent = "Abrir último enlace leído";
+    $("ultimoEnlace").hidden = false;
+    $("btnReintentar").hidden = false;
+  }
+
+  function detenerLector() {
+    clearTimeout(temporizadorReinicio);
+    temporizadorReinicio = null;
+
+    if (!reader) return Promise.resolve();
+
+    const anterior = reader;
+    reader = null;
+
+    return anterior.stop()
+      .catch(() => {})
+      .then(() => anterior.clear().catch(() => {}));
+  }
+
+  async function iniciarLector() {
+    if (iniciando || reader || procesando) return;
+
+    iniciando = true;
+    $("lector").style.display = "block";
+    $("estado").textContent = "Activando cámara...";
+
+    try {
+      const nuevo = new Html5Qrcode("lector");
+      reader = nuevo;
+
+      await nuevo.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: (w, h) => {
+            const lado = Math.floor(Math.min(w, h, 280));
+            return { width: lado, height: lado };
+          },
+          aspectRatio: 1
+        },
+        textoQR => {
+          // Bloquea nuevas lecturas mientras se procesa esta.
+          if (procesando) return;
+
+          procesando = true;
+          const codigo = textoQR.trim();
+
+          detenerLector().then(() => procesarCodigo(codigo));
+        },
+        () => {}
+      );
+
+      $("estado").textContent = "🟢 Cámara activa. Escanee el QR.";
+    } catch (error) {
+      reader = null;
+      $("estado").textContent =
+        "No se pudo iniciar la cámara. Verifique los permisos.";
+      $("msg").textContent = String(error);
+    } finally {
+      iniciando = false;
+    }
+  }
+
+  async function procesarCodigo(codigo) {
+    try {
+      if (!codigo) {
+        hablar("Código vacío");
+        return;
       }
 
-      // Configurar voz en español
-      function cargarVoz() {
-        const voces = window.speechSynthesis.getVoices();
-        vozDisponible =
-          voces.find(v => v.lang.startsWith("es")) ||
-          voces.find(v => v.lang === "es-ES") ||
-          voces[0];
+      $("msg").textContent = "QR leído correctamente.";
+
+      if (esEnlace(codigo)) {
+        // Los enlaces nunca se descartan por el control diario.
+        mostrarEnlace(codigo);
+
+        if (!codigosEnCola.has(codigo)) {
+          cola.push(codigo);
+          codigosEnCola.add(codigo);
+        }
+
+        hablar("Enlace leído. Procesando envío.");
+        await procesarCola();
+      } else {
+        // Para QR que contienen códigos y no enlaces.
+        const fecha = hoy();
+
+        if (registrosHoy[codigo] === fecha) {
+          $("msg").textContent = "Ya se encuentra registrado ❗";
+          hablar("Ya se encuentra registrado");
+        } else {
+          registrosHoy[codigo] = fecha;
+          guardarRegistros();
+
+          $("msg").textContent = "Código registrado localmente ✅";
+          hablar("Código registrado");
+        }
       }
+    } catch (error) {
+      console.error(error);
+      $("msg").textContent = "Error al procesar el QR.";
+      hablar("Ocurrió un error al procesar el código");
+    } finally {
+      // Deja un breve intervalo antes de reactivar la cámara.
+      temporizadorReinicio = setTimeout(async () => {
+        procesando = false;
+        await iniciarLector();
+      }, 1200);
+    }
+  }
 
-      window.speechSynthesis.onvoiceschanged = cargarVoz;
+  async function procesarCola() {
+    while (cola.length > 0) {
+      const url = cola.shift();
 
-      // 🔊 Función para hablar texto
-      function hablar(texto) {
-        if (!vozDisponible) cargarVoz();
-        const msg = new SpeechSynthesisUtterance(texto);
-        msg.voice = vozDisponible;
-        msg.lang = "es-ES";
-        msg.pitch = 1;
-        msg.rate = 1;
-        window.speechSynthesis.cancel(); // detener voces previas
-        window.speechSynthesis.speak(msg);
+      try {
+        $("estado").textContent = "Abriendo enlace de asistencia...";
+
+        // Se prepara desde el clic del usuario para reducir
+        // los bloqueos de ventanas emergentes.
+        if (!ventanaEnvio || ventanaEnvio.closed) {
+          throw new Error("VENTANA_CERRADA");
+        }
+
+        // No cerrar automáticamente: Google necesita tiempo
+        // para recibir y procesar la petición.
+        ventanaEnvio.location.href = url;
+
+        totalEnlaces++;
+        $("contador").textContent =
+          "Enlaces abiertos: " + totalEnlaces;
+
+        $("msg").textContent =
+          "Enlace enviado al navegador. Verifique el resultado.";
+
+        // Pausa entre solicitudes para evitar reemplazar una
+        // navegación antes de que el servidor la procese.
+        await new Promise(resolve => setTimeout(resolve, 1800));
+
+      } catch (error) {
+        console.error("No se pudo abrir el enlace:", error);
+
+        // Conserva el enlace para reintentar manualmente.
+        cola.unshift(url);
+        $("estado").textContent =
+          "No se pudo abrir automáticamente. Use el botón de reintento.";
+
+        mostrarEnlace(url);
+        break;
+      } finally {
+        codigosEnCola.delete(url);
       }
+    }
 
-      async function iniciarLector() {
-        document.getElementById("lector").style.display = "block";
-        const lectorDiv = document.getElementById("lector");
-        lectorDiv.innerHTML = "";
-        reader = new Html5Qrcode("lector");
+    if (cola.length === 0) {
+      $("estado").textContent =
+        "Procesamiento de la cola terminado. Esto no confirma el guardado.";
+    }
+  }
 
-        reader
-          .start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: 250 },
-            async textoQR => {
-              reader.stop();
+  $("btnIniciar").addEventListener("click", async () => {
+    // Abrir la ventana durante el clic real del usuario.
+    // Mantenerla abierta evita el cierre prematuro.
+    ventanaEnvio = window.open("about:blank", "ventanaAsistencia");
 
-              try {
-                const fecha = hoy();
-                const claveQR = textoQR.trim();
-                const msg = document.getElementById("msg");
+    if (!ventanaEnvio) {
+      $("estado").textContent =
+        "El navegador bloqueó la ventana. Permita ventanas emergentes y vuelva a iniciar.";
+      return;
+    }
 
-                if (registrosHoy[claveQR] === fecha) {
-                  msg.innerText = "Ya se encuentra registrado ❗";
-                  hablar("Ya se encuentra registrado");
-                } else {
-                  registrosHoy[claveQR] = fecha;
-                  msg.innerText = "Asistencia registrada ✅";
-                  hablar("Asistencia registrada");
+    $("btnIniciar").disabled = true;
+    hablar("Escáner activado. Puede comenzar a registrar asistencias.");
 
-                  // Solo abre enlaces válidos la primera vez
-                  if (/^https?:\/\//i.test(claveQR)) {
-                    const win = window.open(claveQR, "_blank");
-                    setTimeout(() => {
-                      if (win && !win.closed) win.close();
-                    }, 1000);
-                  }
-                }
+    await iniciarLector();
 
-                // Reiniciar el lector luego de unos segundos
-                setTimeout(() => {
-                  msg.innerText = "";
-                  iniciarLector();
-                }, 2000);
-              } catch (err) {
-                console.error("Error al procesar QR:", err);
-                hablar("Ocurrió un error al procesar el código");
-                iniciarLector();
-              }
-            },
-            error => {}
-          )
-          .catch(err => {
-            alert("Error al acceder a la cámara: " + err);
-          });
-      }
+    $("btnIniciar").disabled = false;
+  });
 
-      // Botón inicial para activar sonido y cámara
-      document.getElementById("btnIniciar").addEventListener("click", () => {
-        hablar("Escáner activado, puede comenzar a registrar asistencias.");
-        document.getElementById("btnIniciar").style.display = "none";
-        iniciarLector();
-      });
-    </script>
-  </body>
+  $("btnReintentar").addEventListener("click", () => {
+    if (!ultimoEnlace) return;
+
+    // El clic permite al navegador abrir la URL directamente.
+    const nuevaVentana = window.open(ultimoEnlace, "_blank");
+
+    if (!nuevaVentana) {
+      $("estado").textContent =
+        "Ventana bloqueada. Abra el enlace azul manualmente.";
+    }
+  });
+
+  window.addEventListener("beforeunload", () => {
+    if (reader) reader.stop().catch(() => {});
+  });
+</script>
+</body>
 </html>
 
