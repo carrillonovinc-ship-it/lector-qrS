@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -360,33 +361,6 @@ let temporizadorMensaje = null;
 let temporizadorLiberacion = null;
 let ultimoCodigo = '';
 
-/* Carga enlaces QR sin abrir pestañas ni sacar el lector de pantalla. */
-function abrirEnlaceQR(texto) {
-  const enlace = String(texto || '').trim();
-  if (!/^https?:\/\//i.test(enlace)) return;
-
-  try {
-    let marco = document.getElementById('marcoEnlaceQR');
-    if (!marco) {
-      marco = document.createElement('iframe');
-      marco.id = 'marcoEnlaceQR';
-      marco.title = 'Contenido del código QR';
-      marco.setAttribute('aria-hidden', 'true');
-      marco.style.position = 'fixed';
-      marco.style.width = '1px';
-      marco.style.height = '1px';
-      marco.style.left = '-10000px';
-      marco.style.bottom = '0';
-      marco.style.border = '0';
-      marco.style.opacity = '0';
-      document.body.appendChild(marco);
-    }
-    marco.src = enlace;
-  } catch (e) {
-    console.warn('No se pudo cargar el enlace del QR:', e);
-  }
-}
-
 /*
  * Registros realizados durante esta sesión.
  * La clave es el contenido completo del QR.
@@ -501,9 +475,6 @@ function procesarQR(textoQR) {
 
   codigoEnLectura = codigo;
   programarLiberacion(codigo);
-
-  /* Si el QR contiene un enlace web, abrirlo en la pestaña de fondo. */
-  abrirEnlaceQR(codigo);
 
   total++;
   actualizarContador();
