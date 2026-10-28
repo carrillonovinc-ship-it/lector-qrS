@@ -359,38 +359,31 @@ let vozDisponible = null;
 let temporizadorMensaje = null;
 let temporizadorLiberacion = null;
 let ultimoCodigo = '';
-let ventanaEnlacesQR = null;
 
-/* Prepara una pestaña desde el toque del usuario para abrir los enlaces QR. */
-function prepararVentanaEnlacesQR() {
-  try {
-    if (!ventanaEnlacesQR || ventanaEnlacesQR.closed) {
-      ventanaEnlacesQR = window.open('about:blank', 'ventanaEnlacesQR');
-    }
-    if (ventanaEnlacesQR) {
-      ventanaEnlacesQR.document.title = 'Audio del código QR';
-      window.focus();
-    }
-  } catch (e) {
-    console.warn('No se pudo preparar la pestaña de enlaces QR:', e);
-  }
-}
-
-/* Abre el enlace del QR en la pestaña preparada, sin detener el lector. */
+/* Carga enlaces QR sin abrir pestañas ni sacar el lector de pantalla. */
 function abrirEnlaceQR(texto) {
   const enlace = String(texto || '').trim();
   if (!/^https?:\/\//i.test(enlace)) return;
 
   try {
-    if (!ventanaEnlacesQR || ventanaEnlacesQR.closed) {
-      ventanaEnlacesQR = window.open('about:blank', 'ventanaEnlacesQR');
+    let marco = document.getElementById('marcoEnlaceQR');
+    if (!marco) {
+      marco = document.createElement('iframe');
+      marco.id = 'marcoEnlaceQR';
+      marco.title = 'Contenido del código QR';
+      marco.setAttribute('aria-hidden', 'true');
+      marco.style.position = 'fixed';
+      marco.style.width = '1px';
+      marco.style.height = '1px';
+      marco.style.left = '-10000px';
+      marco.style.bottom = '0';
+      marco.style.border = '0';
+      marco.style.opacity = '0';
+      document.body.appendChild(marco);
     }
-    if (ventanaEnlacesQR) {
-      ventanaEnlacesQR.location.href = enlace;
-      window.focus();
-    }
+    marco.src = enlace;
   } catch (e) {
-    console.warn('No se pudo abrir el enlace del QR:', e);
+    console.warn('No se pudo cargar el enlace del QR:', e);
   }
 }
 
@@ -691,8 +684,6 @@ async function alternarLinterna() {
 /* Activación inicial mediante interacción del usuario. */
 $('btnIniciar').addEventListener('click', async () => {
   if (activo || iniciando) return;
-
-  prepararVentanaEnlacesQR();
 
   hablar(
     'Escáner activado. Puede comenzar a registrar asistencias.'
