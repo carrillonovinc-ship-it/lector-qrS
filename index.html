@@ -588,8 +588,48 @@ async function iniciarLector() {
       }
     };
 
+    // Identifica primero la cámara trasera real y usa su deviceId explícito.
+    // Esto evita que algunos navegadores seleccionen la cámara frontal.
+    let camaraTraseraId = null;
+    let flujoPrueba = null;
+
+    try {
+      flujoPrueba = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { exact: 'environment' },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30, max: 30 }
+        },
+        audio: false
+      });
+      const pistaPrueba = flujoPrueba.getVideoTracks()[0];
+      if (pistaPrueba) {
+        camaraTraseraId = pistaPrueba.getSettings().deviceId || null;
+      }
+    } catch (errorCamaraTrasera) {
+      console.warn('No se pudo identificar la cámara trasera por facingMode:', errorCamaraTrasera);
+    } finally {
+      if (flujoPrueba) {
+        flujoPrueba.getTracks().forEach(pista => pista.stop());
+      }
+    }
+
+    // Si el navegador no entrega deviceId, busca una cámara cuyo nombre indique
+    // que es trasera; deja facingMode environment como último recurso.
+    if (!camaraTraseraId) {
+      try {
+        const dispositivos = await navigator.mediaDevices.enumerateDevices();
+        const camaras = dispositivos.filter(d => d.kind === 'videoinput');
+        const trasera = camaras.find(d => /back|rear|environment|trasera|posterior|背面|后置/i.test(d.label));
+        if (trasera) camaraTraseraId = trasera.deviceId;
+      } catch (errorListaCamaras) {
+        console.warn('No se pudieron enumerar las cámaras:', errorListaCamaras);
+      }
+    }
+
     await reader.start(
-      { facingMode: { exact: 'environment' } },
+      camaraTraseraId || { facingMode: { exact: 'environment' } },
       config,
 
       /* No detener la cámara después de cada lectura. */
