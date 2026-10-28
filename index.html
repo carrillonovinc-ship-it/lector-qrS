@@ -2,106 +2,295 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#1769aa">
-  <title>Escáner QR - Modo Profesor</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111111">
+<title>Escáner QR - Modo Profesor</title>
 
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-  <style>
-    * { box-sizing: border-box; }
+<style>
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
 
-    body {
-      margin: 0;
-      padding: 16px 12px;
-      text-align: center;
-      font-family: Arial, sans-serif;
-      background: #f1f5f9;
-      color: #1e293b;
-    }
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #111;
+  color: white;
+  font-family: Arial, sans-serif;
+}
 
-    h2 { font-size: 22px; }
+#app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #111;
+}
 
-    .panel {
-      max-width: 480px;
-      margin: auto;
-      padding: 18px 14px;
-      background: white;
-      border-radius: 14px;
-      box-shadow: 0 3px 12px #00000012;
-    }
+#lector {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #111;
+}
 
-    button {
-      width: 100%;
-      max-width: 320px;
-      padding: 14px;
-      border: 0;
-      border-radius: 9px;
-      background: #1769aa;
-      color: white;
-      font-size: 17px;
-      font-weight: bold;
-      cursor: pointer;
-    }
+#lector video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
 
-    button:disabled { opacity: .6; }
+#lector > div {
+  border: 0 !important;
+}
 
-    #lector {
-      display: none;
-      width: 100%;
-      max-width: 400px;
-      margin: 14px auto;
-      overflow: hidden;
-    }
+#lector img,
+#lector canvas {
+  max-width: 100%;
+}
 
-    #lector video {
-      width: 100% !important;
-      border-radius: 10px;
-    }
+#lector__dashboard_section,
+#lector__status_span,
+#lector__header_message {
+  display: none !important;
+}
 
-    #estado {
-      font-size: 15px;
-      line-height: 1.5;
-    }
+/* Capa visual del lector */
+#interfaz {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
 
-    #msg {
-      font-size: 19px;
-      font-weight: bold;
-      overflow-wrap: anywhere;
-    }
+#barraSuperior {
+  position: absolute;
+  top: max(18px, env(safe-area-inset-top));
+  left: 18px;
+  right: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 15px;
+  text-shadow: 0 1px 5px #000;
+}
 
-    #contador {
-      font-size: 16px;
-      font-weight: bold;
-    }
+#titulo {
+  font-size: 17px;
+  font-weight: bold;
+}
 
-    #ultimo {
-      font-size: 13px;
-      overflow-wrap: anywhere;
-      color: #64748b;
-    }
+#estado {
+  position: absolute;
+  top: 10%;
+  width: 100%;
+  padding: 0 20px;
+  text-align: center;
+  font-size: 15px;
+  text-shadow: 0 1px 5px #000;
+}
 
-    .verde { color: #16803c; }
-    .rojo { color: #b42318; }
-  </style>
+#marco {
+  position: absolute;
+  width: min(78vw, 340px);
+  height: min(78vw, 340px);
+  max-height: 37vh;
+  top: 35%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.025);
+}
+
+.esquina {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-color: white;
+  border-style: solid;
+}
+
+.sup-izq {
+  top: -2px; left: -2px;
+  border-width: 4px 0 0 4px;
+}
+
+.sup-der {
+  top: -2px; right: -2px;
+  border-width: 4px 4px 0 0;
+}
+
+.inf-izq {
+  bottom: -2px; left: -2px;
+  border-width: 0 0 4px 4px;
+}
+
+.inf-der {
+  bottom: -2px; right: -2px;
+  border-width: 0 4px 4px 0;
+}
+
+#linea {
+  position: absolute;
+  top: 50%;
+  left: 2%;
+  right: 2%;
+  height: 2px;
+  background: #e5f4ff;
+  box-shadow: 0 0 6px #fff;
+  animation: barrido 2s linear infinite alternate;
+}
+
+@keyframes barrido {
+  from { transform: translateY(-100px); }
+  to { transform: translateY(100px); }
+}
+
+#instruccion {
+  position: absolute;
+  top: calc(35% + min(39vw, 170px) + 20px);
+  width: 100%;
+  text-align: center;
+  padding: 0 12px;
+  font-size: 17px;
+  text-shadow: 0 1px 5px #000;
+}
+
+#zonaInferior {
+  position: absolute;
+  bottom: calc(10% + env(safe-area-inset-bottom));
+  left: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  pointer-events: auto;
+}
+
+.control {
+  border: none;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  padding: 8px 18px;
+}
+
+.icono {
+  font-size: 34px;
+  line-height: 1;
+}
+
+#botonQR {
+  color: #12a7f5;
+  font-weight: bold;
+}
+
+#resultado {
+  position: absolute;
+  z-index: 10;
+  top: 17%;
+  left: 8%;
+  right: 8%;
+  display: none;
+  padding: 14px;
+  text-align: center;
+  background: rgba(0,0,0,.82);
+  border-radius: 12px;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+#contador {
+  font-size: 12px;
+  opacity: .8;
+}
+
+#btnIniciar {
+  position: absolute;
+  z-index: 20;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  padding: 15px 24px;
+  border: none;
+  border-radius: 9px;
+  background: #1769aa;
+  color: white;
+  font-size: 17px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+#btnReintentar {
+  pointer-events: auto;
+  display: none;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 8px;
+}
+
+.oculto {
+  display: none !important;
+}
+</style>
 </head>
 
 <body>
-  <h2>📷 Escáner QR - Modo Profesor</h2>
+<div id="app">
 
-  <div class="panel">
-    <p id="estado">Pulse iniciar para activar la cámara.</p>
+  <div id="lector"></div>
 
-    <button id="btnIniciar">🔊 Iniciar escáner</button>
+  <div id="interfaz">
+    <div id="barraSuperior">
+      <span id="titulo">📷 Escáner QR - Profesor</span>
+      <span id="contador">0 leídos</span>
+    </div>
 
-    <div id="lector"></div>
+    <div id="estado">Pulse iniciar para activar la cámara</div>
 
-    <p id="msg" role="status" aria-live="polite"></p>
-    <p id="contador">Solicitudes iniciadas: 0</p>
-    <p id="pendientes">Pendientes: 0</p>
-    <p id="ultimo">Esperando el primer QR...</p>
+    <div id="marco">
+      <span class="esquina sup-izq"></span>
+      <span class="esquina sup-der"></span>
+      <span class="esquina inf-izq"></span>
+      <span class="esquina inf-der"></span>
+      <div id="linea"></div>
+    </div>
+
+    <div id="instruccion">
+      Coloca el código dentro del recuadro
+    </div>
+
+    <div id="zonaInferior">
+      <button class="control" id="btnLinterna">
+        <span class="icono">🔦</span>
+        <span>Linterna</span>
+      </button>
+
+      <button class="control" id="botonQR">
+        <span class="icono">▤</span>
+        <span>Código QR</span>
+      </button>
+
+      <button id="btnReintentar">Reintentar pendientes</button>
+    </div>
   </div>
+
+  <div id="resultado" role="status" aria-live="polite"></div>
+
+  <button id="btnIniciar">📷 Iniciar escáner</button>
+</div>
 
 <script>
 "use strict";
@@ -109,32 +298,19 @@
 const $ = id => document.getElementById(id);
 
 let lector = null;
-let iniciando = false;
 let activo = false;
-let procesandoQR = false;
-let voz = null;
-
-let total = 0;
-let enCurso = 0;
-let ultimoCodigo = "";
-let ultimaLectura = 0;
+let iniciando = false;
+let linternaEncendida = false;
+let totalLeidos = 0;
+let vozDisponible = null;
+let ultimaLectura = "";
+let horaUltimaLectura = 0;
+let temporizadorResultado = null;
+let procesandoCola = false;
 
 const cola = [];
 const pendientes = new Set();
-const ultimaSolicitud = new Map();
-
-// Fecha local de Bolivia.
-function hoy() {
-  const p = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/La_Paz",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(new Date());
-
-  const o = Object.fromEntries(p.map(x => [x.type, x.value]));
-  return `${o.year}-${o.month}-${o.day}`;
-}
+const ultimoEnvio = new Map();
 
 function hablar(texto) {
   if (!("speechSynthesis" in window)) return;
@@ -142,36 +318,44 @@ function hablar(texto) {
   try {
     speechSynthesis.cancel();
 
-    const mensaje = new SpeechSynthesisUtterance(texto);
-    mensaje.lang = "es-ES";
-    mensaje.rate = 1;
-    speechSynthesis.speak(mensaje);
+    const msg = new SpeechSynthesisUtterance(texto);
+    msg.lang = "es-ES";
+    msg.rate = 1;
+    const voces = speechSynthesis.getVoices();
+    vozDisponible =
+      voces.find(v => v.lang.toLowerCase().startsWith("es")) ||
+      null;
+
+    if (vozDisponible) msg.voice = vozDisponible;
+    speechSynthesis.speak(msg);
   } catch (e) {
     console.warn("Voz no disponible", e);
   }
 }
 
-function esURL(texto) {
+function esURLValida(texto) {
   try {
     const u = new URL(texto);
-
-    return (
-      (u.protocol === "https:" || u.protocol === "http:") &&
-      u.hostname === "script.google.com" &&
-      u.pathname.includes("/macros/s/") &&
-      u.pathname.endsWith("/exec")
-    );
+    return u.protocol === "https:" || u.protocol === "http:";
   } catch (e) {
     return false;
   }
 }
 
+function mostrarResultado(texto, error = false) {
+  const caja = $("resultado");
+  caja.textContent = texto;
+  caja.style.display = "block";
+
+  clearTimeout(temporizadorResultado);
+  temporizadorResultado = setTimeout(() => {
+    caja.style.display = "none";
+  }, 1800);
+}
+
 function actualizarContador() {
   $("contador").textContent =
-    "Solicitudes iniciadas: " + total;
-
-  $("pendientes").textContent =
-    "Pendientes: " + (cola.length + enCurso);
+    totalLeidos + " leídos · " + cola.length + " pendientes";
 }
 
 async function iniciarEscaner() {
@@ -180,53 +364,50 @@ async function iniciarEscaner() {
   iniciando = true;
   $("btnIniciar").disabled = true;
   $("estado").textContent = "Activando cámara trasera...";
-  $("msg").textContent = "";
-  $("lector").style.display = "block";
 
   try {
     if (!window.isSecureContext ||
         !navigator.mediaDevices ||
         !navigator.mediaDevices.getUserMedia) {
       throw new Error(
-        "Abre el lector en Chrome mediante HTTPS."
+        "Abre esta página con HTTPS y permite la cámara en Chrome."
       );
     }
 
     if (typeof Html5Qrcode === "undefined") {
       throw new Error(
-        "No se pudo cargar el lector QR. Comprueba Internet."
+        "No se pudo cargar la biblioteca. Comprueba tu conexión."
       );
     }
 
-    lector = new Html5Qrcode("lector");
+    lector = new Html5Qrcode("lector", {
+      verbose: false
+    });
 
-    // Solicita directamente la cámara trasera.
     await lector.start(
-      { facingMode: { ideal: "environment" } },
+      { facingMode: "environment" },
       {
         fps: 12,
-        qrbox: (ancho, alto) => {
-          const lado = Math.floor(
-            Math.min(ancho, alto, 260)
-          );
+        qrbox: (w, h) => {
+          const lado = Math.floor(Math.min(w, h, 280));
           return { width: lado, height: lado };
         },
         aspectRatio: 1
       },
       texto => {
-        // Nunca se detiene la cámara para enviar una solicitud.
-        const ahora = Date.now();
+        // La cámara NO se detiene durante la lectura.
         const codigo = texto.trim();
+        const ahora = Date.now();
 
-        // Evita repetir el mismo QR mientras permanece frente
-        // a la cámara. Permite volver a leerlo después de 4 s.
-        if (codigo === ultimoCodigo &&
-            ahora - ultimaLectura < 4000) {
+        // Evita registrar repetidamente el mismo QR
+        // mientras permanece delante de la cámara.
+        if (codigo === ultimaLectura &&
+            ahora - horaUltimaLectura < 2500) {
           return;
         }
 
-        ultimoCodigo = codigo;
-        ultimaLectura = ahora;
+        ultimaLectura = codigo;
+        horaUltimaLectura = ahora;
 
         recibirQR(codigo);
       },
@@ -234,42 +415,28 @@ async function iniciarEscaner() {
     );
 
     activo = true;
+    $("btnIniciar").classList.add("oculto");
+    $("estado").textContent = "Cámara activa";
+    $("instruccion").textContent =
+      "Coloca el código dentro del recuadro";
+
+    hablar("Escáner activado");
+
+  } catch (e) {
+    console.error("Error al iniciar cámara:", e);
 
     $("estado").textContent =
-      "🟢 Lector activo. Escanee los QR uno tras otro.";
-    $("msg").textContent = "Listo para registrar asistencia.";
-    $("msg").className = "verde";
-    $("btnIniciar").style.display = "none";
-
-    hablar("Escáner activado. Puede comenzar.");
-
-  } catch (error) {
-    console.error("Error al activar cámara:", error);
-
-    activo = false;
-    $("lector").style.display = "none";
-    $("btnIniciar").style.display = "block";
-
-    if (error.name === "NotAllowedError" ||
-        error.name === "PermissionDeniedError") {
-      $("estado").textContent =
-        "Permita la cámara para este sitio en Chrome y en los ajustes de Android.";
-    } else if (error.name === "NotFoundError") {
-      $("estado").textContent =
-        "No se encontró una cámara disponible.";
-    } else if (error.name === "NotReadableError") {
-      $("estado").textContent =
-        "La cámara está ocupada por otra aplicación.";
-    } else {
-      $("estado").textContent =
-        "No se pudo iniciar: " + (error.message || error);
-    }
+      e.name === "NotAllowedError"
+        ? "Permite el acceso a la cámara en Chrome."
+        : "No se pudo iniciar: " + (e.message || e);
 
     if (lector) {
-      try { await lector.stop(); } catch (e) {}
-      try { await lector.clear(); } catch (e) {}
+      try { await lector.stop(); } catch (_) {}
+      try { await lector.clear(); } catch (_) {}
       lector = null;
     }
+
+    $("btnIniciar").classList.remove("oculto");
 
   } finally {
     iniciando = false;
@@ -280,53 +447,43 @@ async function iniciarEscaner() {
 function recibirQR(codigo) {
   if (!codigo) return;
 
-  if (!esURL(codigo)) {
-    $("msg").textContent = "QR no válido para este sistema.";
-    $("msg").className = "rojo";
-    hablar("Código QR no válido");
+  totalLeidos++;
+  actualizarContador();
+
+  if (!esURLValida(codigo)) {
+    mostrarResultado("QR leído, pero no contiene un enlace web válido.");
     return;
   }
 
-  // Si el mismo enlace ya está en la cola, no se duplica.
+  // Evita tener el mismo enlace repetido en la cola.
   if (pendientes.has(codigo)) return;
 
-  // Evita reenvíos accidentales durante unos segundos.
-  const ultima = ultimaSolicitud.get(codigo) || 0;
-  if (Date.now() - ultima < 4000) return;
+  // Permite reenviar el mismo QR después de 5 segundos.
+  const ultima = ultimoEnvio.get(codigo) || 0;
+  if (Date.now() - ultima < 5000) return;
 
+  ultimoEnvio.set(codigo, Date.now());
   pendientes.add(codigo);
-  ultimaSolicitud.set(codigo, Date.now());
   cola.push(codigo);
 
-  $("msg").textContent = "QR leído. Solicitud en proceso...";
-  $("msg").className = "verde";
-  $("ultimo").textContent = "Último QR: " + codigo;
-
-  actualizarContador();
+  mostrarResultado("QR leído. Procesando asistencia...");
   procesarCola();
+  actualizarContador();
 }
 
 async function procesarCola() {
-  // Un solo consumidor de la cola; la cámara sigue activa.
-  if (procesandoQR) return;
-  procesandoQR = true;
+  if (procesandoCola) return;
+  procesandoCola = true;
 
   try {
     while (cola.length > 0) {
       const url = cola.shift();
 
-      enCurso++;
-      total++;
-      actualizarContador();
-
       try {
-        $("estado").textContent =
-          "Cámara activa · Enviando asistencia en segundo plano";
-
         /*
-         * GET sin CORS: permite solicitar el endpoint externo
-         * sin abandonar la página. La respuesta es opaca:
-         * no permite confirmar si Sheets guardó la asistencia.
+         * Envío GET en segundo plano.
+         * no-cors evita necesitar autorización CORS del endpoint.
+         * La respuesta opaca NO confirma que la hoja guardó los datos.
          */
         await fetch(url, {
           method: "GET",
@@ -335,45 +492,91 @@ async function procesarCola() {
           redirect: "follow"
         });
 
-        $("msg").textContent =
-          "Solicitud enviada al navegador. Lector listo para otro QR.";
-        $("msg").className = "verde";
+        mostrarResultado("Solicitud enviada. Continúe escaneando.");
+        hablar("QR procesado");
 
-      } catch (error) {
-        console.error("Error de red:", error);
+      } catch (e) {
+        console.error("Error de envío:", e);
 
-        /*
-         * Conserva el enlace para un reintento posterior.
-         * No se afirma que Google Sheets lo haya guardado.
-         */
+        // Mantener el enlace pendiente para reintentar.
         cola.unshift(url);
+        $("btnReintentar").style.display = "block";
+        mostrarResultado("Sin conexión. Solicitud pendiente.", true);
 
-        $("msg").textContent =
-          "Sin conexión o solicitud fallida. QR conservado para reintentar.";
-        $("msg").className = "rojo";
-
-        // Evita un bucle de reintentos continuo sin conexión.
-        await new Promise(resolve => setTimeout(resolve, 2500));
+        // Evita un bucle rápido si no hay conexión.
+        await new Promise(resolve => setTimeout(resolve, 2000));
         break;
 
       } finally {
-        enCurso--;
+        pendientes.delete(url);
         actualizarContador();
       }
     }
   } finally {
-    procesandoQR = false;
+    procesandoCola = false;
     actualizarContador();
 
     if (cola.length === 0) {
       $("estado").textContent =
-        "🟢 Cámara activa · Listo para el siguiente estudiante.";
+        activo ? "Cámara activa" : "Cámara detenida";
+      $("btnReintentar").style.display = "none";
     }
   }
 }
 
+async function alternarLinterna() {
+  if (!lector || !activo) {
+    mostrarResultado("Inicia primero el escáner.");
+    return;
+  }
+
+  try {
+    linternaEncendida = !linternaEncendida;
+
+    await lector.applyVideoConstraints({
+      advanced: [{ torch: linternaEncendida }]
+    });
+
+    $("btnLinterna").querySelector(".icono").textContent =
+      linternaEncendida ? "💡" : "🔦";
+
+    mostrarResultado(
+      linternaEncendida
+        ? "Linterna encendida"
+        : "Linterna apagada"
+    );
+  } catch (e) {
+    linternaEncendida = false;
+    mostrarResultado(
+      "La linterna no está disponible en esta cámara."
+    );
+  }
+}
+
 $("btnIniciar").addEventListener("click", iniciarEscaner);
+$("btnLinterna").addEventListener("click", alternarLinterna);
+
+$("botonQR").addEventListener("click", () => {
+  if (!activo) {
+    iniciarEscaner();
+  } else {
+    mostrarResultado("Apunta la cámara al código QR.");
+  }
+});
+
+$("btnReintentar").addEventListener("click", () => {
+  if (cola.length) procesarCola();
+});
+
+document.addEventListener("visibilitychange", () => {
+  // No se detiene manualmente la cámara al volver a la página.
+  if (!document.hidden && !activo && !iniciando) {
+    $("estado").textContent =
+      "Pulse iniciar para reactivar la cámara.";
+  }
+});
 </script>
 </body>
 </html>
+
 
