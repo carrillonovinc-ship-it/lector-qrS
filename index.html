@@ -579,15 +579,16 @@ async function iniciarLector() {
         height: lado
       },
       aspectRatio: 1,
-      disableFlip: false
+      disableFlip: false,
+      videoConstraints: {
+        facingMode: 'environment',
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
     };
 
     await reader.start(
-      {
-        facingMode: { exact: 'environment' },
-        width: { ideal: 3840 },
-        height: { ideal: 2160 }
-      },
+      { facingMode: 'environment' },
       config,
 
       /* No detener la cámara después de cada lectura. */
@@ -606,27 +607,6 @@ async function iniciarLector() {
       video.setAttribute('autoplay', 'true');
       video.muted = true;
       video.playsInline = true;
-
-      // Solicita la mayor resolución disponible en la cámara trasera.
-      // No cambia el resto del funcionamiento del lector.
-      try {
-        const pista = video.srcObject?.getVideoTracks?.()[0];
-        if (pista) {
-          const capacidades = pista.getCapabilities ? pista.getCapabilities() : {};
-          const restricciones = {};
-          if (capacidades.width?.max) restricciones.width = { ideal: capacidades.width.max };
-          if (capacidades.height?.max) restricciones.height = { ideal: capacidades.height.max };
-          if (capacidades.focusMode?.includes('continuous')) {
-            restricciones.focusMode = 'continuous';
-          }
-          if (Object.keys(restricciones).length) {
-            await pista.applyConstraints(restricciones);
-          }
-        }
-      } catch (e) {
-        console.warn('La cámara no admite resolución o enfoque mejorados:', e);
-      }
-
       try { await video.play(); } catch (_) {}
     }
 
