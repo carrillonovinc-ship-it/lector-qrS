@@ -167,7 +167,7 @@ html, body {
   height: 2px;
   background: #00ff66;
   box-shadow: 0 0 7px #00ff66, 0 0 14px #00ff66;
-  animation: barrido 1.8s ease-in-out infinite alternate;
+  animation: barrido 2.2s linear infinite alternate;
   pointer-events: none;
 }
 
@@ -218,6 +218,11 @@ html, body {
 
 #botonQR {
   color: #12a7f5;
+  font-weight: bold;
+}
+
+#btnApagar {
+  color: #ff7777;
   font-weight: bold;
 }
 
@@ -334,6 +339,11 @@ button:disabled {
         <span>Código QR</span>
       </button>
 
+      <button class="control oculto" id="btnApagar" type="button">
+        <span class="icono">⏹</span>
+        <span>Apagar lector</span>
+      </button>
+
     </div>
   </div>
 
@@ -359,31 +369,76 @@ let vozDisponible = null;
 let temporizadorMensaje = null;
 let temporizadorLiberacion = null;
 let ultimoCodigo = '';
+let colaEnlacesQR = [];
+let procesandoEnlacesQR = false;
+let enlacesPendientes = 0;
 
-/* Carga enlaces QR sin abrir pestañas ni sacar el lector de pantalla. */
+/*
+ * Encola cada enlace QR para enviarlo en segundo plano.
+ * No abre pestañas ni abandona la pantalla del lector.
+ * La cola procesa los enlaces uno por uno para evitar
+ * que varias solicitudes se pisen entre sí.
+ */
 function abrirEnlaceQR(texto) {
   const enlace = String(texto || '').trim();
   if (!/^https?:\/\//i.test(enlace)) return;
 
+  colaEnlacesQR.push({ enlace, intentos: 0 });
+  enlacesPendientes++;
+  actualizarEstadoCola();
+  procesarColaEnlacesQR();
+}
+
+function actualizarEstadoCola() {
+  if (!activo && !iniciando) return;
+  if (enlacesPendientes > 0) {
+    $('estado').textContent = `Cámara activa · ${enlacesPendientes} enlace(s) en proceso`;
+  } else {
+    $('estado').textContent = 'Cámara activa';
+  }
+}
+
+async function procesarColaEnlacesQR() {
+  if (procesandoEnlacesQR) return;
+  procesandoEnlacesQR = true;
+
   try {
-    let marco = document.getElementById('marcoEnlaceQR');
-    if (!marco) {
-      marco = document.createElement('iframe');
-      marco.id = 'marcoEnlaceQR';
-      marco.title = 'Contenido del código QR';
-      marco.setAttribute('aria-hidden', 'true');
-      marco.style.position = 'fixed';
-      marco.style.width = '1px';
-      marco.style.height = '1px';
-      marco.style.left = '-10000px';
-      marco.style.bottom = '0';
-      marco.style.border = '0';
-      marco.style.opacity = '0';
-      document.body.appendChild(marco);
+    while (colaEnlacesQR.length > 0) {
+      const trabajo = colaEnlacesQR[0];
+      try {
+        /*
+         * no-cors permite disparar el GET sin leer la respuesta
+         * entre dominios. El navegador no cambia de pestaña.
+         */
+        await fetch(trabajo.enlace, {
+          method: 'GET',
+          mode: 'no-cors',
+          cache: 'no-store',
+          redirect: 'follow',
+          credentials: 'omit'
+        });
+
+        colaEnlacesQR.shift();
+        enlacesPendientes = Math.max(0, enlacesPendientes - 1);
+        actualizarEstadoCola();
+      } catch (error) {
+        trabajo.intentos++;
+        console.warn('No se pudo enviar el enlace QR; se reintentará:', error);
+
+        if (trabajo.intentos < 3) {
+          await new Promise(resolve => setTimeout(resolve, 700 * trabajo.intentos));
+        } else {
+          colaEnlacesQR.shift();
+          enlacesPendientes = Math.max(0, enlacesPendientes - 1);
+          actualizarEstadoCola();
+          mostrar('No se pudo enviar un enlace. Comprueba la conexión a Internet.', '', 4500);
+        }
+      }
     }
-    marco.src = enlace;
-  } catch (e) {
-    console.warn('No se pudo cargar el enlace del QR:', e);
+  } finally {
+    procesandoEnlacesQR = false;
+    actualizarEstadoCola();
+    if (colaEnlacesQR.length > 0) procesarColaEnlacesQR();
   }
 }
 
@@ -517,8 +572,8 @@ function procesarQR(textoQR) {
   } else {
     registrosHoy.set(codigo, fecha);
 
-    mostrar('Asistencia registrada correctamente', 'exito', 2500);
-    hablar('Asistencia registrada');
+    mostrar('QR leído y enviado al sistema en segundo plano', 'exito', 2500);
+    hablar('Código leído');
   }
 
 }
@@ -582,8 +637,26 @@ async function iniciarLector() {
       disableFlip: false
     };
 
+    // Selecciona primero una cámara física trasera y pasa su ID como texto.
+    // Esto evita el error de html5-qrcode cuando recibe un objeto de cámara
+    // con varias claves (cameraIdOrConfig).
+    let camaras = [];
+    try {
+      camaras = await Html5Qrcode.getCameras();
+    } catch (errorCamaras) {
+      console.warn('No se pudieron enumerar las cámaras inicialmente:', errorCamaras);
+    }
+
+    if (!camaras || camaras.length === 0) {
+      throw new Error('No se detectaron cámaras. Permite el acceso a la cámara y vuelve a intentar.');
+    }
+
+    const camaraTrasera = camaras.find(c =>
+      /back|rear|environment|trasera|posterior|world/i.test(c.label || '')
+    ) || camaras[camaras.length - 1];
+
     await reader.start(
-      { facingMode: 'environment' },
+      camaraTrasera.id,
       config,
 
       /* No detener la cámara después de cada lectura. */
@@ -602,6 +675,27 @@ async function iniciarLector() {
       video.setAttribute('autoplay', 'true');
       video.muted = true;
       video.playsInline = true;
+
+      // Solicita la mayor resolución disponible en la cámara trasera.
+      // No cambia el resto del funcionamiento del lector.
+      try {
+        const pista = video.srcObject?.getVideoTracks?.()[0];
+        if (pista) {
+          const capacidades = pista.getCapabilities ? pista.getCapabilities() : {};
+          const restricciones = {};
+          if (capacidades.width?.max) restricciones.width = { ideal: capacidades.width.max };
+          if (capacidades.height?.max) restricciones.height = { ideal: capacidades.height.max };
+          if (capacidades.focusMode?.includes('continuous')) {
+            restricciones.focusMode = 'continuous';
+          }
+          if (Object.keys(restricciones).length) {
+            await pista.applyConstraints(restricciones);
+          }
+        }
+      } catch (e) {
+        console.warn('La cámara no admite resolución o enfoque mejorados:', e);
+      }
+
       try { await video.play(); } catch (_) {}
     }
 
@@ -609,7 +703,8 @@ async function iniciarLector() {
     linterna = false;
 
     $('btnIniciar').classList.add('oculto');
-    $('estado').textContent = 'Cámara activa';
+    $('btnApagar').classList.remove('oculto');
+    actualizarEstadoCola();
     $('instruccion').textContent =
       'Coloca el código dentro del recuadro';
 
@@ -642,11 +737,43 @@ async function iniciarLector() {
     }
 
     $('btnIniciar').classList.remove('oculto');
+    $('btnApagar').classList.add('oculto');
 
   } finally {
     iniciando = false;
     $('btnIniciar').disabled = false;
   }
+}
+
+/* Apaga la cámara y detiene el lector. Los enlaces ya encolados continúan procesándose. */
+async function apagarLector() {
+  if (iniciando) {
+    mostrar('La cámara se está activando. Espera un momento y vuelve a pulsar.');
+    return;
+  }
+  if (!reader && !activo) return;
+
+  activo = false;
+  linterna = false;
+  clearTimeout(temporizadorLiberacion);
+  codigoEnLectura = '';
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+
+  try { if (reader) await reader.stop(); } catch (e) { console.warn(e); }
+  try { if (reader) reader.clear(); } catch (e) { console.warn(e); }
+
+  const video = $('lector').querySelector('video');
+  if (video && video.srcObject) {
+    try { video.srcObject.getTracks().forEach(track => track.stop()); } catch (_) {}
+  }
+
+  $('lector').innerHTML = '';
+  reader = null;
+  $('btnIniciar').classList.remove('oculto');
+  $('btnApagar').classList.add('oculto');
+  $('estado').textContent = 'Lector apagado';
+  $('btnLinterna').querySelector('.icono').textContent = '🔦';
+  mostrar(enlacesPendientes ? `Lector apagado. Quedan ${enlacesPendientes} enlace(s) por enviar.` : 'Lector apagado.');
 }
 
 /* Control de la linterna. */
@@ -703,13 +830,14 @@ $('botonQR').addEventListener('click', () => {
 
 /* Botón de linterna. */
 $('btnLinterna').addEventListener('click', alternarLinterna);
+$('btnApagar').addEventListener('click', apagarLector);
 
 /* Recuperación al regresar a la pestaña del lector. */
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
 
   if (activo) {
-    $('estado').textContent = 'Cámara activa';
+    actualizarEstadoCola();
     $('instruccion').textContent =
       'Coloca el código dentro del recuadro';
   } else if (!iniciando) {
