@@ -167,8 +167,7 @@ html, body {
   height: 2px;
   background: #00ff66;
   box-shadow: 0 0 7px #00ff66, 0 0 14px #00ff66;
-  animation: barrido 1.8s linear infinite alternate;
-  opacity: 1;
+  animation: barrido 1.8s ease-in-out infinite alternate;
   pointer-events: none;
 }
 
@@ -360,34 +359,6 @@ let vozDisponible = null;
 let temporizadorMensaje = null;
 let temporizadorLiberacion = null;
 let ultimoCodigo = '';
-let bloqueadoPorAudio = false;
-
-/* Carga enlaces QR sin abrir pestañas ni sacar el lector de pantalla. */
-function abrirEnlaceQR(texto) {
-  const enlace = String(texto || '').trim();
-  if (!/^https?:\/\//i.test(enlace)) return;
-
-  try {
-    let marco = document.getElementById('marcoEnlaceQR');
-    if (!marco) {
-      marco = document.createElement('iframe');
-      marco.id = 'marcoEnlaceQR';
-      marco.title = 'Contenido del código QR';
-      marco.setAttribute('aria-hidden', 'true');
-      marco.style.position = 'fixed';
-      marco.style.width = '1px';
-      marco.style.height = '1px';
-      marco.style.left = '-10000px';
-      marco.style.bottom = '0';
-      marco.style.border = '0';
-      marco.style.opacity = '0';
-      document.body.appendChild(marco);
-    }
-    marco.src = enlace;
-  } catch (e) {
-    console.warn('No se pudo cargar el enlace del QR:', e);
-  }
-}
 
 /*
  * Registros realizados durante esta sesión.
@@ -431,21 +402,12 @@ if ('speechSynthesis' in window) {
 }
 
 /* Anuncio por voz. */
-function hablar(texto, alTerminar = null) {
-  if (!('speechSynthesis' in window)) {
-    if (typeof alTerminar === 'function') alTerminar();
-    return;
-  }
+function hablar(texto) {
+  if (!('speechSynthesis' in window)) return;
 
   cargarVoz();
 
   const mensaje = new SpeechSynthesisUtterance(texto);
-  mensaje.onend = () => {
-    if (typeof alTerminar === 'function') alTerminar();
-  };
-  mensaje.onerror = () => {
-    if (typeof alTerminar === 'function') alTerminar();
-  };
 
   if (vozDisponible) {
     mensaje.voice = vozDisponible;
@@ -499,9 +461,7 @@ function programarLiberacion(codigo) {
 function procesarQR(textoQR) {
   const codigo = String(textoQR || '').trim();
 
-  if (!codigo || !activo || bloqueadoPorAudio) return;
-
-  bloqueadoPorAudio = true;
+  if (!codigo || !activo) return;
 
   /*
    * Mantiene bloqueada la lectura mientras el mismo QR
@@ -515,27 +475,20 @@ function procesarQR(textoQR) {
   codigoEnLectura = codigo;
   programarLiberacion(codigo);
 
-  /* Si el QR contiene un enlace web, abrirlo en la pestaña de fondo. */
-  abrirEnlaceQR(codigo);
-
   total++;
   actualizarContador();
 
   const fecha = hoy();
   const fechaRegistro = registrosHoy.get(codigo);
 
-  const liberarLector = () => {
-    bloqueadoPorAudio = false;
-  };
-
   if (fechaRegistro === fecha) {
     mostrar('Ya se encuentra registrado ❗', 'repetido', 3000);
-    hablar('Ya se encuentra registrado', liberarLector);
+    hablar('Ya se encuentra registrado');
   } else {
     registrosHoy.set(codigo, fecha);
 
     mostrar('Asistencia registrada correctamente', 'exito', 2500);
-    hablar('Asistencia registrada', liberarLector);
+    hablar('Asistencia registrada');
   }
 
 }
@@ -596,12 +549,7 @@ async function iniciarLector() {
         height: lado
       },
       aspectRatio: 1,
-      disableFlip: false,
-      videoConstraints: {
-        facingMode: 'environment',
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
-      }
+      disableFlip: false
     };
 
     await reader.start(
