@@ -553,7 +553,7 @@ async function iniciarLector() {
     };
 
     await reader.start(
-      { facingMode: { ideal: 'environment' } },
+      { facingMode: 'environment' },
       config,
 
       /* No detener la cámara después de cada lectura. */
@@ -696,4 +696,3 @@ window.addEventListener('pagehide', () => {
 </script>
 </body>
 </html>
-
