@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111111">
-<title>Lector QR - Modo Profesor</title>
+<title>Lector QR continuo - Modo Profesor</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -15,21 +15,21 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;color:
 #lector>div{border:0!important}
 #lector img,#lector canvas{max-width:100%}
 #lector__dashboard_section,#lector__status_span,#lector__header_message{display:none!important}
-#interfaz{position:absolute;inset:0;z-index:5;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,.25),transparent 25%,transparent 70%,rgba(0,0,0,.45))}
+#interfaz{position:absolute;inset:0;z-index:5;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,.23),transparent 24%,transparent 75%,rgba(0,0,0,.45))}
 #barra{position:absolute;top:max(18px,env(safe-area-inset-top));left:18px;right:18px;display:flex;justify-content:space-between;align-items:center;text-shadow:0 1px 5px #000;font-size:15px;gap:10px}
 #titulo{font-size:16px;font-weight:600}
 #contador{font-size:12px;opacity:.95;white-space:nowrap}
-#estado{position:absolute;top:10%;width:100%;padding:0 20px;text-align:center;font-size:15px;text-shadow:0 1px 5px #000}
-#marco{position:absolute;width:min(88vw,430px);height:min(88vw,430px);max-height:48vh;top:36%;left:50%;transform:translate(-50%,-50%);border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.025);box-shadow:0 0 0 100vmax rgba(0,0,0,.13)}
-.esquina{position:absolute;width:28px;height:28px;border-color:#fff;border-style:solid;filter:drop-shadow(0 0 2px #000)}
+#estado{position:absolute;top:9%;width:100%;padding:0 16px;text-align:center;font-size:15px;text-shadow:0 1px 5px #000}
+#marco{position:absolute;width:min(94vw,520px);height:min(94vw,58vh,520px);top:39%;left:50%;transform:translate(-50%,-50%);border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.025);box-shadow:0 0 0 100vmax rgba(0,0,0,.13)}
+.esquina{position:absolute;width:30px;height:30px;border-color:#fff;border-style:solid;filter:drop-shadow(0 0 2px #000)}
 .sup-izq{top:-2px;left:-2px;border-width:4px 0 0 4px}.sup-der{top:-2px;right:-2px;border-width:4px 4px 0 0}.inf-izq{bottom:-2px;left:-2px;border-width:0 0 4px 4px}.inf-der{bottom:-2px;right:-2px;border-width:0 4px 4px 0}
-#linea{position:absolute;top:50%;left:2%;right:2%;height:2px;background:#e8f7ff;box-shadow:0 0 7px #fff;animation:barrido 1.8s ease-in-out infinite alternate}
-@keyframes barrido{from{transform:translateY(-min(35vw,150px))}to{transform:translateY(min(35vw,150px))}}
-#instruccion{position:absolute;top:calc(36% + min(44vw,215px) + 16px);width:100%;padding:0 14px;text-align:center;font-size:16px;text-shadow:0 1px 5px #000}
-#zonaInferior{position:absolute;bottom:calc(6% + env(safe-area-inset-bottom));left:0;width:100%;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:auto}
-.control{border:0;background:transparent;color:#fff;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:15px;padding:7px 18px;cursor:pointer}
-.icono{font-size:30px;line-height:1}#botonQR{color:#12a7f5;font-weight:bold}
-#resultado{position:absolute;z-index:10;top:16%;left:7%;right:7%;display:none;padding:14px;text-align:center;background:rgba(0,0,0,.88);border:1px solid #555;border-radius:12px;font-size:15px;overflow-wrap:anywhere;pointer-events:none}
+#linea{position:absolute;top:0;left:2%;right:2%;height:4px;border-radius:3px;background:#00ff54;box-shadow:0 0 8px #00ff54,0 0 16px rgba(0,255,84,.85);animation:barrido 1.6s linear infinite alternate}
+@keyframes barrido{from{top:0}to{top:calc(100% - 4px)}}
+#instruccion{position:absolute;top:calc(39% + min(47vw,29vh) + 17px);width:100%;padding:0 12px;text-align:center;font-size:16px;text-shadow:0 1px 5px #000}
+#zonaInferior{position:absolute;bottom:calc(4% + env(safe-area-inset-bottom));left:0;width:100%;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:auto}
+.control{border:0;background:transparent;color:#fff;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:15px;padding:6px 18px;cursor:pointer}
+.icono{font-size:29px;line-height:1}#botonQR{color:#12a7f5;font-weight:bold}
+#resultado{position:absolute;z-index:10;top:15%;left:7%;right:7%;display:none;padding:13px;text-align:center;background:rgba(0,0,0,.88);border:1px solid #555;border-radius:12px;font-size:15px;overflow-wrap:anywhere;pointer-events:none}
 #btnIniciar{position:absolute;z-index:20;top:50%;left:50%;transform:translate(-50%,-50%);padding:15px 24px;border:0;border-radius:9px;background:#087fc1;color:#fff;font-size:17px;font-weight:bold;white-space:nowrap;box-shadow:0 4px 18px #0008}
 .oculto{display:none!important}
 button:disabled{opacity:.55}
@@ -50,23 +50,26 @@ button:disabled{opacity:.55}
   </div>
   <div id="resultado" role="status" aria-live="polite"></div>
   <button id="btnIniciar" type="button">📷 Iniciar escáner</button>
+  <!-- El iframe permanece oculto: no cambia la pestaña visible del lector. -->
+  <iframe id="destinoOculto" title="Procesamiento del enlace QR" aria-hidden="true"
+    style="position:absolute;width:1px;height:1px;left:-10000px;top:-10000px;border:0"></iframe>
 </div>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
 let lector=null,activo=false,iniciando=false,linterna=false,total=0,ultimoCodigo='',ultimoTiempo=0,temporizador=null;
-const enlacesAbiertos=new Set();
+const ultimoEnvio=new Map();
+const pendientes=new Set();
 
-function mostrar(texto,duracion=2800){
+function mostrar(texto,duracion=2200){
   const caja=$('resultado');caja.textContent=texto;caja.style.display='block';
   clearTimeout(temporizador);temporizador=setTimeout(()=>caja.style.display='none',duracion);
 }
-function actualizar(){$('contador').textContent=total+' leídos';}
+function actualizar(){ $('contador').textContent=total+' leídos'; }
 function esURL(texto){
-  try{const u=new URL(texto);return (u.protocol==='https:'||u.protocol==='http:') && !!u.hostname;}
+  try{const u=new URL(texto);return (u.protocol==='https:'||u.protocol==='http:')&&!!u.hostname;}
   catch(_){return false;}
 }
-
 async function iniciarEscaner(){
   if(activo||iniciando)return;
   iniciando=true;$('btnIniciar').disabled=true;$('estado').textContent='Activando cámara trasera…';
@@ -76,23 +79,21 @@ async function iniciarEscaner(){
     if(typeof Html5Qrcode==='undefined')
       throw new Error('No se pudo cargar el lector QR. Comprueba tu conexión a Internet.');
     if(lector){try{await lector.stop();}catch(_){}try{await lector.clear();}catch(_){}lector=null;}
-
     lector=new Html5Qrcode('lector',{
       verbose:false,
       formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE],
       experimentalFeatures:{useBarCodeDetectorIfSupported:true}
     });
-    const lado=Math.floor(Math.min(window.innerWidth*.84,window.innerHeight*.46,420));
-    const config={
-      fps:20,
-      qrbox:{width:lado,height:lado},
-      aspectRatio:1,
-      disableFlip:false
-    };
-    await lector.start({facingMode:'environment'},config,onScan,()=>{});
+    // Área de detección grande, ajustada al tamaño de la pantalla.
+    const lado=Math.floor(Math.min(window.innerWidth*.90,window.innerHeight*.54,500));
+    await lector.start(
+      {facingMode:'environment'},
+      {fps:20,qrbox:{width:lado,height:lado},aspectRatio:1,disableFlip:false},
+      onScan,()=>{}
+    );
     activo=true;
     $('btnIniciar').classList.add('oculto');
-    $('estado').textContent='Cámara activa';
+    $('estado').textContent='Cámara activa · lectura continua';
     $('instruccion').textContent='Coloca el código dentro del recuadro';
   }catch(e){
     console.error('Error al iniciar cámara:',e);
@@ -100,39 +101,42 @@ async function iniciarEscaner(){
     mostrar(e.message||String(e),4500);
     if(lector){try{await lector.stop();}catch(_){}try{await lector.clear();}catch(_){}lector=null;}
     activo=false;$('btnIniciar').classList.remove('oculto');
-  }finally{
-    iniciando=false;$('btnIniciar').disabled=false;
-  }
+  }finally{iniciando=false;$('btnIniciar').disabled=false;}
 }
 
 function onScan(texto){
   const codigo=String(texto||'').trim(),ahora=Date.now();
   if(!codigo)return;
-  // Evita repetir el mismo QR mientras permanece delante de la cámara.
-  if(codigo===ultimoCodigo&&ahora-ultimoTiempo<3500)return;
+  // Evita repeticiones mientras el mismo QR sigue frente a la cámara.
+  if(codigo===ultimoCodigo&&ahora-ultimoTiempo<2200)return;
   ultimoCodigo=codigo;ultimoTiempo=ahora;total++;actualizar();
 
-  if(!esURL(codigo)){mostrar('QR leído, pero no contiene un enlace web.');return;}
-
-  // Cada URL se abre una sola vez durante esta sesión, evitando que la cámara
-  // cree una pestaña nueva continuamente mientras el mismo QR sigue visible.
-  if(enlacesAbiertos.has(codigo)){
-    mostrar('Este enlace ya se abrió. Vuelve a la pestaña del lector para seguir escaneando.');
+  if(!esURL(codigo)){
+    mostrar('QR leído. No contiene un enlace web.');
     return;
   }
-  enlacesAbiertos.add(codigo);
+  // Bloqueo por enlace: evita disparar la misma asistencia muchas veces.
+  const anterior=ultimoEnvio.get(codigo)||0;
+  if(ahora-anterior<8000){mostrar('QR leído; este enlace ya se procesó recientemente.');return;}
+  ultimoEnvio.set(codigo,ahora);
 
-  // El navegador decide si abre una pestaña nueva o bloquea la ventana.
-  // La página del lector permanece abierta en su pestaña original.
-  const nueva=window.open(codigo,'_blank');
-  if(nueva){
-    mostrar('Enlace abierto en otra pestaña. Al terminar, vuelve a la pestaña del lector.',4500);
-  }else{
-    enlacesAbiertos.delete(codigo);
-    mostrar('Chrome bloqueó la pestaña. Permite ventanas emergentes o abre el enlace manualmente.',4500);
-  }
+  // No se usa window.open: el lector permanece en primer plano y sigue leyendo.
+  // Se solicita el enlace en segundo plano. Las respuestas no-cors son opacas:
+  // no permiten confirmar desde JavaScript si el servidor guardó el registro.
+  pendientes.add(codigo);
+  mostrar('QR leído. Enviando en segundo plano…');
+  fetch(codigo,{method:'GET',mode:'no-cors',cache:'no-store',redirect:'follow',keepalive:true})
+    .then(()=>{
+      pendientes.delete(codigo);
+      $('estado').textContent='Cámara activa · lectura continua';
+      mostrar('Solicitud enviada. Continúa con el siguiente QR.');
+    })
+    .catch(err=>{
+      pendientes.delete(codigo);
+      console.error('No se pudo solicitar el enlace:',err);
+      mostrar('QR leído, pero no se pudo enviar. Comprueba la conexión.',3200);
+    });
 }
-
 async function alternarLinterna(){
   if(!lector||!activo){mostrar('Inicia primero el escáner.');return;}
   try{
@@ -146,15 +150,11 @@ async function alternarLinterna(){
   }
 }
 $('btnIniciar').addEventListener('click',iniciarEscaner);
-$('botonQR').addEventListener('click',()=>activo?mostrar('Apunta la cámara al código QR.'):iniciarEscaner());
+$('botonQR').addEventListener('click',()=>activo?mostrar('Apunta la cámara al siguiente código QR.'):iniciarEscaner());
 $('btnLinterna').addEventListener('click',alternarLinterna);
 document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden&&activo){
-    $('estado').textContent='Cámara activa';
-    $('instruccion').textContent='Coloca el código dentro del recuadro';
-  }else if(!document.hidden&&!activo&&!iniciando){
-    $('estado').textContent='Pulsa iniciar para reactivar la cámara.';
-  }
+  if(!document.hidden&&activo)$('estado').textContent='Cámara activa · lectura continua';
+  else if(!document.hidden&&!activo&&!iniciando)$('estado').textContent='Pulsa iniciar para reactivar la cámara.';
 });
 </script>
 </body>
