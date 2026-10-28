@@ -692,8 +692,6 @@ async function alternarLinterna() {
 $('btnIniciar').addEventListener('click', async () => {
   if (activo || iniciando) return;
 
-  prepararVentanaEnlacesQR();
-
   hablar(
     'Escáner activado. Puede comenzar a registrar asistencias.'
   );
