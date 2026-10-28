@@ -638,11 +638,7 @@ async function iniciarLector() {
     };
 
     await reader.start(
-      {
-        facingMode: { exact: 'environment' },
-        width: { ideal: 3840 },
-        height: { ideal: 2160 }
-      },
+      { facingMode: 'environment' },
       config,
 
       /* No detener la cámara después de cada lectura. */
