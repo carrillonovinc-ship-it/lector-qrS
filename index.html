@@ -2,186 +2,86 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111111">
-<title>Lector QR - Asistencia</title>
+<title>Lector QR - Modo Profesor</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
-:root{color-scheme:dark;--azul:#079ee8;--blanco:#fff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#111;color:#fff;font-family:Arial,Helvetica,sans-serif}
-button{font:inherit}
-#app{position:fixed;inset:0;overflow:hidden;background:#111}
-#lector{position:absolute;inset:0;width:100%;height:100%;background:#111}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;color:#fff;font-family:Arial,Helvetica,sans-serif}
+#app{position:fixed;inset:0;background:#111;overflow:hidden}
+#lector{position:absolute;inset:0;background:#111}
 #lector video{width:100%!important;height:100%!important;object-fit:cover!important}
 #lector>div{border:0!important}
-#lector img,#lector canvas{max-width:100%}
 #lector__dashboard_section,#lector__status_span,#lector__header_message{display:none!important}
-#capa{position:absolute;inset:0;z-index:5;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,.38),transparent 24%,transparent 70%,rgba(0,0,0,.38))}
-#barra{position:absolute;top:max(18px,env(safe-area-inset-top));left:20px;right:20px;display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:15px;text-shadow:0 1px 5px #000}
+#interfaz{position:absolute;inset:0;z-index:5;pointer-events:none;background:linear-gradient(to bottom,rgba(0,0,0,.24),transparent 25%,transparent 70%,rgba(0,0,0,.4))}
+#barra{position:absolute;top:max(18px,env(safe-area-inset-top));left:20px;right:20px;display:flex;justify-content:space-between;align-items:center;text-shadow:0 1px 5px #000;font-size:15px}
 #titulo{font-size:16px;font-weight:600}
-#contador{font-size:12px;white-space:nowrap;background:rgba(0,0,0,.35);padding:6px 9px;border-radius:14px}
-#estado{position:absolute;top:10%;left:0;width:100%;padding:0 20px;text-align:center;font-size:15px;text-shadow:0 1px 5px #000}
-#marco{position:absolute;width:min(78vw,340px);height:min(78vw,340px);max-height:37vh;top:35%;left:50%;transform:translate(-50%,-50%);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.025)}
-.esquina{position:absolute;width:24px;height:24px;border-color:#fff;border-style:solid}
+#contador{font-size:12px;opacity:.9}
+#estado{position:absolute;top:10%;width:100%;padding:0 20px;text-align:center;font-size:15px;text-shadow:0 1px 5px #000}
+#marco{position:absolute;width:min(78vw,350px);height:min(78vw,350px);max-height:37vh;top:35%;left:50%;transform:translate(-50%,-50%);border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.035);box-shadow:0 0 0 100vmax rgba(0,0,0,.12)}
+.esquina{position:absolute;width:25px;height:25px;border-color:#fff;border-style:solid;filter:drop-shadow(0 0 2px #000)}
 .sup-izq{top:-2px;left:-2px;border-width:4px 0 0 4px}.sup-der{top:-2px;right:-2px;border-width:4px 4px 0 0}.inf-izq{bottom:-2px;left:-2px;border-width:0 0 4px 4px}.inf-der{bottom:-2px;right:-2px;border-width:0 4px 4px 0}
-#linea{position:absolute;top:50%;left:2%;right:2%;height:2px;background:#e5f4ff;box-shadow:0 0 6px #fff;animation:barrido 2s linear infinite alternate}
-@keyframes barrido{from{transform:translateY(-100px)}to{transform:translateY(100px)}}
-#instruccion{position:absolute;top:calc(35% + min(39vw,170px) + 20px);width:100%;text-align:center;padding:0 12px;font-size:17px;text-shadow:0 1px 5px #000}
-#zonaInferior{position:absolute;bottom:calc(8% + env(safe-area-inset-bottom));left:0;width:100%;display:flex;flex-direction:column;align-items:center;gap:18px;pointer-events:auto}
-.control{border:0;background:transparent;color:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;font-size:15px;padding:7px 18px;min-width:110px}
-.icono{font-size:32px;line-height:1}
-#botonQR{color:var(--azul);font-weight:bold}
-#resultado{position:absolute;z-index:10;top:17%;left:7%;right:7%;display:none;padding:14px;text-align:center;background:rgba(0,0,0,.84);border:1px solid rgba(255,255,255,.16);border-radius:12px;font-size:15px;overflow-wrap:anywhere;pointer-events:none}
-#resultado small{display:block;margin-top:5px;opacity:.8;font-size:12px}
-#btnIniciar{position:absolute;z-index:20;top:50%;left:50%;transform:translate(-50%,-50%);padding:15px 24px;border:0;border-radius:9px;background:#1769aa;color:#fff;font-size:17px;font-weight:bold;white-space:nowrap;box-shadow:0 4px 18px #0008}
-#btnReintentar{display:none;pointer-events:auto;padding:10px 16px;border:0;border-radius:8px;background:#fff;color:#111;font-weight:bold}
-#botonVoz{position:absolute;top:max(62px,calc(env(safe-area-inset-top) + 48px));right:18px;z-index:8;pointer-events:auto;background:rgba(0,0,0,.45);border:1px solid #ffffff55;border-radius:20px;color:#fff;padding:7px 10px;font-size:12px}
+#linea{position:absolute;top:50%;left:2%;right:2%;height:2px;background:#e8f7ff;box-shadow:0 0 7px #fff;animation:barrido 1.8s ease-in-out infinite alternate}
+@keyframes barrido{from{transform:translateY(-125px)}to{transform:translateY(125px)}}
+#instruccion{position:absolute;top:calc(35% + min(39vw,175px) + 18px);width:100%;padding:0 14px;text-align:center;font-size:17px;text-shadow:0 1px 5px #000}
+#zonaInferior{position:absolute;bottom:calc(8% + env(safe-area-inset-bottom));left:0;width:100%;display:flex;flex-direction:column;align-items:center;gap:15px;pointer-events:auto}
+.control{border:0;background:transparent;color:#fff;display:flex;flex-direction:column;align-items:center;gap:7px;font-size:15px;padding:8px 18px;cursor:pointer}
+.icono{font-size:32px;line-height:1}#botonQR{color:#12a7f5;font-weight:bold}
+#resultado{position:absolute;z-index:10;top:17%;left:8%;right:8%;display:none;padding:14px;text-align:center;background:rgba(0,0,0,.86);border:1px solid #444;border-radius:12px;font-size:15px;overflow-wrap:anywhere;pointer-events:none}
+#btnIniciar{position:absolute;z-index:20;top:50%;left:50%;transform:translate(-50%,-50%);padding:15px 24px;border:0;border-radius:9px;background:#087fc1;color:#fff;font-size:17px;font-weight:bold;white-space:nowrap;box-shadow:0 4px 18px #0008}
 .oculto{display:none!important}
 </style>
 </head>
 <body>
 <div id="app">
   <div id="lector"></div>
-  <div id="capa">
-    <div id="barra"><span id="titulo">‹ &nbsp; Lector QR</span><span id="contador">0 leídos</span></div>
+  <div id="interfaz">
+    <div id="barra"><span id="titulo">Escáner QR - Profesor</span><span id="contador">0 leídos</span></div>
     <div id="estado">Pulse iniciar para activar la cámara</div>
     <div id="marco"><span class="esquina sup-izq"></span><span class="esquina sup-der"></span><span class="esquina inf-izq"></span><span class="esquina inf-der"></span><div id="linea"></div></div>
     <div id="instruccion">Coloca el código dentro del recuadro</div>
-  </div>
-  <button id="botonVoz" type="button" aria-pressed="true">🔊 Voz activada</button>
-  <div id="zonaInferior">
-    <button class="control" id="btnLinterna" type="button"><span class="icono">♜</span><span>Linterna</span></button>
-    <button class="control" id="botonQR" type="button"><span class="icono">▤</span><span>Código QR</span></button>
-    <button id="btnReintentar" type="button">Reintentar pendientes</button>
+    <div id="zonaInferior">
+      <button class="control" id="btnLinterna" type="button"><span class="icono">🔦</span><span>Linterna</span></button>
+      <button class="control" id="botonQR" type="button"><span class="icono">▤</span><span>Código QR</span></button>
+    </div>
   </div>
   <div id="resultado" role="status" aria-live="polite"></div>
   <button id="btnIniciar" type="button">📷 Iniciar escáner</button>
-  <iframe id="audioFrame" title="Procesamiento del enlace" aria-hidden="true" tabindex="-1" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;left:-10000px;top:-10000px;border:0"></iframe>
 </div>
 <script>
 'use strict';
-const $ = id => document.getElementById(id);
-let lector=null, activo=false, iniciando=false, linternaEncendida=false;
-let totalLeidos=0, ultimaLectura='', horaUltimaLectura=0, temporizadorResultado=null;
-let procesandoCola=false, vozActivada=true, audioFrameDisponible=false;
-const cola=[], pendientes=new Set(), ultimoEnvio=new Map();
-
-function hablar(texto){
-  if(!vozActivada || !('speechSynthesis' in window) || !texto) return;
-  try{
-    // No cancelar el mensaje anterior: así no se corta el anuncio de un escaneo previo.
-    const msg=new SpeechSynthesisUtterance(String(texto).slice(0,450));
-    msg.lang='es-ES'; msg.rate=0.95; msg.pitch=1; msg.volume=1;
-    const voces=window.speechSynthesis.getVoices();
-    const voz=voces.find(v=>/^es(-|_)/i.test(v.lang)) || voces.find(v=>/spanish|español/i.test(v.name));
-    if(voz) msg.voice=voz;
-    window.speechSynthesis.speak(msg);
-  }catch(e){console.warn('Voz no disponible',e);}
-}
-function textoLegibleQR(codigo){
-  try{
-    const u=new URL(codigo);
-    // Evita leer un enlace larguísimo símbolo por símbolo; anuncia dominio y ruta.
-    const ruta=(u.pathname && u.pathname!=='/')?decodeURIComponent(u.pathname.replace(/\//g,' ')):'';
-    const parametros=u.searchParams.toString();
-    return 'Código QR leído. Enlace de '+u.hostname.replace(/^www\./,'')+(ruta?' '+ruta:'')+(parametros?' . Parámetros del enlace.':'');
-  }catch(_){return 'Código QR leído: '+codigo;}
-}
-function esURLValida(texto){try{const u=new URL(texto);return u.protocol==='https:'||u.protocol==='http:';}catch(_){return false;}}
-function mostrarResultado(texto, error=false){
-  const caja=$('resultado'); caja.textContent='';
-  caja.appendChild(document.createTextNode(texto));
-  caja.style.display='block'; caja.style.borderColor=error?'#ff7777':'rgba(255,255,255,.16)';
-  clearTimeout(temporizadorResultado); temporizadorResultado=setTimeout(()=>caja.style.display='none',2200);
-}
-function actualizarContador(){$('contador').textContent=totalLeidos+' leídos · '+cola.length+' pendientes';}
+const $=id=>document.getElementById(id);
+let lector=null,activo=false,iniciando=false,linterna=false,total=0,ultimoCodigo='',ultimoTiempo=0,temporizador=null;
+const cooldown=new Map();
+function mostrar(texto){const caja=$('resultado');caja.textContent=texto;caja.style.display='block';clearTimeout(temporizador);temporizador=setTimeout(()=>caja.style.display='none',2600)}
+function actualizar(){ $('contador').textContent=total+' leídos'; }
+function esURL(texto){try{const u=new URL(texto);return u.protocol==='https:'||u.protocol==='http:'}catch(_){return false}}
 async function iniciarEscaner(){
-  if(iniciando||activo)return;
-  iniciando=true; $('btnIniciar').disabled=true; $('estado').textContent='Activando cámara trasera…';
-  try{
-    if(!window.isSecureContext||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw new Error('Abre la aplicación mediante HTTPS y permite la cámara en Chrome.');
-    if(typeof Html5Qrcode==='undefined') throw new Error('No se pudo cargar la biblioteca del lector. Comprueba tu conexión a Internet.');
-    if(lector){try{await lector.clear();}catch(_){} lector=null;}
-    lector=new Html5Qrcode('lector',{verbose:false});
-    const config={fps:12,qrbox:(w,h)=>{const lado=Math.floor(Math.min(w,h,280));return{width:lado,height:lado};},aspectRatio:1};
-    try{
-      await lector.start({facingMode:'environment'},config,alDetectarQR,()=>{});
-    }catch(primerError){
-      // Respaldo para dispositivos que no aceptan facingMode directamente.
-      const cams=await Html5Qrcode.getCameras();
-      if(!cams||!cams.length) throw primerError;
-      const trasera=cams.find(c=>/back|rear|environment|trasera|posterior/i.test(c.label))||cams[cams.length-1];
-      await lector.start(trasera.id,config,alDetectarQR,()=>{});
-    }
-    activo=true; $('btnIniciar').classList.add('oculto'); $('estado').textContent='Cámara activa';
-    $('instruccion').textContent='Coloca el código dentro del recuadro';
-    hablar('Escáner activado');
-  }catch(e){
-    console.error('Error al iniciar cámara:',e);
-    $('estado').textContent=(e&&e.name==='NotAllowedError')?'Permite el acceso a la cámara en Chrome.':('No se pudo iniciar: '+(e.message||e));
-    if(lector){try{if(lector.isScanning)await lector.stop();}catch(_){} try{await lector.clear();}catch(_){} lector=null;}
-    $('btnIniciar').classList.remove('oculto'); mostrarResultado($('estado').textContent,true);
-  }finally{iniciando=false;$('btnIniciar').disabled=false;}
+ if(activo||iniciando)return;iniciando=true;$('btnIniciar').disabled=true;$('estado').textContent='Activando cámara trasera…';
+ try{
+  if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia)throw new Error('Abre esta página desde HTTPS y permite la cámara en Chrome.');
+  if(typeof Html5Qrcode==='undefined')throw new Error('No se pudo cargar el lector QR. Comprueba tu conexión a Internet.');
+  if(lector){try{await lector.clear()}catch(_){}lector=null}
+  lector=new Html5Qrcode('lector',{verbose:false,formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE],experimentalFeatures:{useBarCodeDetectorIfSupported:true}});
+  const config={fps:20,qrbox:(w,h)=>{const lado=Math.floor(Math.min(w,h,Math.max(230,Math.min(360,Math.min(window.innerWidth,window.innerHeight)*.72))));return {width:lado,height:lado}},aspectRatio:1,disableFlip:false,videoConstraints:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080},focusMode:'continuous'}};
+  await lector.start({facingMode:'environment'},config,onScan,()=>{});
+  activo=true;$('btnIniciar').classList.add('oculto');$('estado').textContent='Cámara activa';$('instruccion').textContent='Coloca el código dentro del recuadro';
+ }catch(e){console.error(e);$('estado').textContent='No se pudo iniciar la cámara: '+(e.message||e);$('btnIniciar').classList.remove('oculto');mostrar('Revisa permisos, HTTPS y que ninguna otra aplicación esté usando la cámara.');if(lector){try{await lector.stop()}catch(_){}try{await lector.clear()}catch(_){}lector=null}}
+ finally{iniciando=false;$('btnIniciar').disabled=false}
 }
-function alDetectarQR(texto){
-  const codigo=String(texto||'').trim(); if(!codigo)return;
-  const ahora=Date.now();
-  if(codigo===ultimaLectura&&ahora-horaUltimaLectura<3000)return;
-  ultimaLectura=codigo; horaUltimaLectura=ahora; totalLeidos++; actualizarContador();
-  // El lector pronuncia el QR al instante; no espera a la petición web.
-  hablar(textoLegibleQR(codigo));
-  if(!esURLValida(codigo)){
-    mostrarResultado('QR leído. Contenido: '+codigo);
-    return;
-  }
-  if(pendientes.has(codigo))return;
-  const ultima=ultimoEnvio.get(codigo)||0;
-  if(ahora-ultima<5000){mostrarResultado('Este enlace ya fue leído recientemente.');return;}
-  ultimoEnvio.set(codigo,ahora); pendientes.add(codigo); cola.push(codigo);
-  mostrarResultado('QR leído. Enviando enlace en segundo plano…'); actualizarContador(); procesarCola();
+function onScan(texto){const codigo=String(texto||'').trim(),ahora=Date.now();if(!codigo)return;if(codigo===ultimoCodigo&&ahora-ultimoTiempo<2500)return;ultimoCodigo=codigo;ultimoTiempo=ahora;total++;actualizar();
+ if(!esURL(codigo)){mostrar('Código leído: no contiene un enlace web.');return}
+ const anterior=cooldown.get(codigo)||0;if(ahora-anterior<5000){mostrar('Este enlace ya se abrió hace un momento.');return}cooldown.set(codigo,ahora);
+ // No se lee en voz alta la dirección del QR. Se abre el destino completo sin cerrarlo.
+ // Si la página de destino contiene su propio audio y permite reproducción, ese audio lo controla la página.
+ try{const nueva=window.open(codigo,'_blank','noopener');if(nueva){mostrar('Enlace abierto. El audio debe reproducirse desde la página de destino.');}else{mostrar('Chrome bloqueó la ventana. Permite ventanas emergentes para abrir el enlace.');}}
+ catch(e){console.error(e);mostrar('No se pudo abrir el enlace.');}
 }
-async function procesarCola(){
-  if(procesandoCola)return; procesandoCola=true;
-  try{
-    while(cola.length){
-      const url=cola.shift(); actualizarContador();
-      try{
-        // Se conserva el envío no-cors para endpoints de registro que no habilitan CORS.
-        // Una respuesta opaca no confirma que el servidor haya guardado el registro.
-        await fetch(url,{method:'GET',mode:'no-cors',cache:'no-store',redirect:'follow'});
-        mostrarResultado('Enlace enviado. Continúe escaneando.');
-        // Intento opcional de cargar el enlace oculto: el navegador puede bloquear el audio automático.
-        // No se considera una reproducción de audio garantizada ni se detiene el lector.
-        try{$('audioFrame').src='about:blank'; setTimeout(()=>$('audioFrame').src=url,80);}catch(e){console.warn('No se pudo cargar el enlace oculto',e);}
-      }catch(e){
-        console.error('Error de envío:',e); cola.unshift(url); $('btnReintentar').style.display='block'; mostrarResultado('No se pudo enviar. Queda pendiente para reintentar.',true); await new Promise(r=>setTimeout(r,1500)); break;
-      }finally{pendientes.delete(url); actualizarContador();}
-    }
-  }finally{
-    procesandoCola=false; actualizarContador();
-    if(!cola.length){$('estado').textContent=activo?'Cámara activa':'Cámara detenida';$('btnReintentar').style.display='none';}
-  }
-}
-async function alternarLinterna(){
-  if(!lector||!activo){mostrarResultado('Inicia primero el escáner.');return;}
-  try{
-    const nueva=!linternaEncendida;
-    await lector.applyVideoConstraints({advanced:[{torch:nueva}]});
-    linternaEncendida=nueva; $('btnLinterna').querySelector('.icono').textContent=nueva?'💡':'🔦';
-    mostrarResultado(nueva?'Linterna encendida':'Linterna apagada');
-  }catch(e){linternaEncendida=false;mostrarResultado('La linterna no está disponible en este dispositivo.',true);}
-}
-$('btnIniciar').addEventListener('click',iniciarEscaner);
-$('botonQR').addEventListener('click',()=>{if(!activo)iniciarEscaner();else mostrarResultado('Apunta la cámara al código QR.');});
-$('btnLinterna').addEventListener('click',alternarLinterna);
-$('btnReintentar').addEventListener('click',()=>{if(cola.length)procesarCola();});
-$('botonVoz').addEventListener('click',()=>{
-  vozActivada=!vozActivada; $('botonVoz').textContent=vozActivada?'🔊 Voz activada':'🔇 Voz desactivada'; $('botonVoz').setAttribute('aria-pressed',String(vozActivada));
-  if(vozActivada)hablar('Lectura por voz activada'); else if('speechSynthesis' in window)window.speechSynthesis.cancel();
-});
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!activo&&!iniciando)$('estado').textContent='Pulse iniciar para reactivar la cámara.';});
-if('speechSynthesis' in window)window.speechSynthesis.getVoices();
+async function alternarLinterna(){if(!lector||!activo){mostrar('Inicia primero el escáner.');return}try{linterna=!linterna;await lector.applyVideoConstraints({advanced:[{torch:linterna}]});$('btnLinterna').querySelector('.icono').textContent=linterna?'💡':'🔦';mostrar(linterna?'Linterna encendida':'Linterna apagada')}catch(e){linterna=false;$('btnLinterna').querySelector('.icono').textContent='🔦';mostrar('La linterna no está disponible en este dispositivo.')}}
+$('btnIniciar').addEventListener('click',iniciarEscaner);$('botonQR').addEventListener('click',()=>activo?mostrar('Apunta la cámara al código QR.'):iniciarEscaner());$('btnLinterna').addEventListener('click',alternarLinterna);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!activo&&!iniciando)$('estado').textContent='Pulsa iniciar para reactivar la cámara.'});
 </script>
 </body>
 </html>
+
