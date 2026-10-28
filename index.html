@@ -1,751 +1,121 @@
-
 <!DOCTYPE html>
 <html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#111111">
-<title>Registro de Asistencia - Modo Profesor</title>
-
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-
-<style>
-* {
-  box-sizing: border-box;
-  -webkit-tap-highlight-color: transparent;
-}
-
-html, body {
-  margin: 0;
-  width: 100%;
-  height: 100%;
-  height: 100dvh;
-  overflow: hidden;
-  overscroll-behavior: none;
-  background: #111;
-  color: white;
-  font-family: Arial, Helvetica, sans-serif;
-  touch-action: manipulation;
-}
-
-#app {
-  position: fixed;
-  inset: 0;
-  overflow: hidden;
-  background: #111;
-}
-
-#lector {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  background: #111;
-  overflow: hidden;
-}
-
-#lector video {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-}
-
-#lector > div {
-  border: 0 !important;
-}
-
-#lector img,
-#lector canvas {
-  max-width: 100%;
-}
-
-#lector__dashboard_section,
-#lector__status_span,
-#lector__header_message {
-  display: none !important;
-}
-
-#interfaz {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  pointer-events: none;
-  background: linear-gradient(
-    to bottom,
-    rgba(0,0,0,.30),
-    transparent 27%,
-    transparent 70%,
-    rgba(0,0,0,.48)
-  );
-}
-
-#barra {
-  position: absolute;
-  top: max(18px, env(safe-area-inset-top));
-  left: 18px;
-  right: 18px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  text-shadow: 0 1px 5px #000;
-}
-
-#titulo {
-  font-size: 16px;
-  font-weight: bold;
-}
-
-#contador {
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-#estado {
-  position: absolute;
-  top: 10%;
-  width: 100%;
-  padding: 0 20px;
-  text-align: center;
-  font-size: 15px;
-  text-shadow: 0 1px 5px #000;
-}
-
-#marco {
-  position: absolute;
-  width: min(84vw, 360px, 40dvh);
-  height: min(84vw, 360px, 40dvh);
-  top: 42%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  border: 1px solid rgba(255,255,255,.25);
-  background: rgba(255,255,255,.025);
-  box-shadow: 0 0 0 100vmax rgba(0,0,0,.13);
-  overflow: hidden;
-}
-
-.esquina {
-  position: absolute;
-  width: 28px;
-  height: 28px;
-  border-color: #fff;
-  border-style: solid;
-  filter: drop-shadow(0 0 2px #000);
-}
-
-.sup-izq {
-  top: -2px;
-  left: -2px;
-  border-width: 4px 0 0 4px;
-}
-
-.sup-der {
-  top: -2px;
-  right: -2px;
-  border-width: 4px 4px 0 0;
-}
-
-.inf-izq {
-  bottom: -2px;
-  left: -2px;
-  border-width: 0 0 4px 4px;
-}
-
-.inf-der {
-  bottom: -2px;
-  right: -2px;
-  border-width: 0 4px 4px 0;
-}
-
-/* Línea verde animada */
-
-#linea {
-  position: absolute;
-  top: 0;
-  left: 3%;
-  right: 3%;
-  height: 2px;
-  background: #00ff66;
-  box-shadow: 0 0 7px #00ff66, 0 0 14px #00ff66;
-  animation: barrido 1.8s linear infinite alternate;
-  opacity: 1;
-  pointer-events: none;
-}
-
-@keyframes barrido {
-  from { top: 0; }
-  to { top: calc(100% - 2px); }
-}
-
-#instruccion {
-  position: absolute;
-  top: calc(42% + min(42vw, 180px) + 16px);
-  width: 100%;
-  padding: 0 14px;
-  text-align: center;
-  font-size: 16px;
-  text-shadow: 0 1px 5px #000;
-}
-
-#zonaInferior {
-  position: absolute;
-  bottom: calc(3% + env(safe-area-inset-bottom));
-  left: 0;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 36px;
-  pointer-events: auto;
-}
-
-.control {
-  border: 0;
-  background: transparent;
-  color: white;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  padding: 8px 14px;
-  cursor: pointer;
-}
-
-.icono {
-  font-size: 30px;
-  line-height: 1;
-}
-
-#botonQR {
-  color: #12a7f5;
-  font-weight: bold;
-}
-
-#resultado {
-  position: absolute;
-  z-index: 10;
-  top: 16%;
-  left: 7%;
-  right: 7%;
-  display: none;
-  padding: 14px;
-  text-align: center;
-  background: rgba(0,0,0,.90);
-  border: 1px solid #555;
-  border-radius: 12px;
-  font-size: 16px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-  pointer-events: none;
-}
-
-#resultado.exito {
-  border-color: #00ff66;
-  color: #00ff66;
-}
-
-#resultado.repetido {
-  border-color: #ffbf47;
-  color: #ffbf47;
-}
-
-#btnIniciar {
-  position: absolute;
-  z-index: 20;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  padding: 15px 24px;
-  border: 0;
-  border-radius: 9px;
-  background: #087fc1;
-  color: white;
-  font-size: 17px;
-  font-weight: bold;
-  white-space: nowrap;
-  box-shadow: 0 4px 18px #0008;
-}
-
-.oculto {
-  display: none !important;
-}
-
-button:disabled {
-  opacity: .55;
-}
-
-@media (max-height: 600px) {
-  #marco {
-    top: 39%;
-    width: min(62vw, 260px, 38dvh);
-    height: min(62vw, 260px, 38dvh);
-  }
-
-  #instruccion {
-    top: calc(39% + min(31vw, 130px, 19dvh) + 12px);
-    font-size: 13px;
-  }
-
-  #zonaInferior {
-    bottom: calc(1% + env(safe-area-inset-bottom));
-    gap: 24px;
-  }
-
-  #estado { top: 9%; font-size: 13px; }
-}
-</style>
-</head>
-
-<body>
-<div id="app">
-
-  <div id="lector"></div>
-
-  <div id="interfaz">
-
-    <div id="barra">
-      <span id="titulo">Escáner QR - Profesor</span>
-      <span id="contador">0 leídos</span>
-    </div>
-
-    <div id="estado">Pulse iniciar para activar la cámara</div>
-
-    <div id="marco">
-      <span class="esquina sup-izq"></span>
-      <span class="esquina sup-der"></span>
-      <span class="esquina inf-izq"></span>
-      <span class="esquina inf-der"></span>
-      <div id="linea"></div>
-    </div>
-
-    <div id="instruccion">
-      Coloca el código dentro del recuadro
-    </div>
-
-    <div id="zonaInferior">
-
-      <button class="control" id="btnLinterna" type="button">
-        <span class="icono">🔦</span>
-        <span>Linterna</span>
-      </button>
-
-      <button class="control" id="botonQR" type="button">
-        <span class="icono">▤</span>
-        <span>Código QR</span>
-      </button>
-
-    </div>
-  </div>
-
-  <div id="resultado" role="status" aria-live="polite"></div>
-
-  <button id="btnIniciar" type="button">
-    📷 Iniciar escáner
-  </button>
-
-</div>
-
-<script>
-'use strict';
-
-const $ = id => document.getElementById(id);
-
-let reader = null;
-let activo = false;
-let iniciando = false;
-let linterna = false;
-let total = 0;
-let vozDisponible = null;
-let temporizadorMensaje = null;
-let temporizadorLiberacion = null;
-let ultimoCodigo = '';
-let bloqueadoPorAudio = false;
-
-/* Carga enlaces QR sin abrir pestañas ni sacar el lector de pantalla. */
-function abrirEnlaceQR(texto) {
-  const enlace = String(texto || '').trim();
-  if (!/^https?:\/\//i.test(enlace)) return;
-
-  try {
-    let marco = document.getElementById('marcoEnlaceQR');
-    if (!marco) {
-      marco = document.createElement('iframe');
-      marco.id = 'marcoEnlaceQR';
-      marco.title = 'Contenido del código QR';
-      marco.setAttribute('aria-hidden', 'true');
-      marco.style.position = 'fixed';
-      marco.style.width = '1px';
-      marco.style.height = '1px';
-      marco.style.left = '-10000px';
-      marco.style.bottom = '0';
-      marco.style.border = '0';
-      marco.style.opacity = '0';
-      document.body.appendChild(marco);
-    }
-    marco.src = enlace;
-  } catch (e) {
-    console.warn('No se pudo cargar el enlace del QR:', e);
-  }
-}
-
-/*
- * Registros realizados durante esta sesión.
- * La clave es el contenido completo del QR.
- */
-const registrosHoy = new Map();
-
-/*
- * Evita que un mismo QR detectado continuamente
- * provoque múltiples registros y anuncios.
- */
-let codigoEnLectura = '';
-
-/* Fecha local, sin desplazamiento UTC. */
-function hoy() {
-  const d = new Date();
-  const anio = d.getFullYear();
-  const mes = String(d.getMonth() + 1).padStart(2, '0');
-  const dia = String(d.getDate()).padStart(2, '0');
-
-  return `${anio}-${mes}-${dia}`;
-}
-
-/* Selección de voz española. */
-function cargarVoz() {
-  if (!('speechSynthesis' in window)) return;
-
-  const voces = window.speechSynthesis.getVoices();
-
-  vozDisponible =
-    voces.find(v => /^es(-|_)/i.test(v.lang) &&
-                    /BO|ES|MX|AR|419/i.test(v.lang)) ||
-    voces.find(v => /^es/i.test(v.lang)) ||
-    voces[0] ||
-    null;
-}
-
-if ('speechSynthesis' in window) {
-  cargarVoz();
-  window.speechSynthesis.onvoiceschanged = cargarVoz;
-}
-
-/* Anuncio por voz. */
-function hablar(texto, alTerminar = null) {
-  if (!('speechSynthesis' in window)) {
-    if (typeof alTerminar === 'function') alTerminar();
-    return;
-  }
-
-  cargarVoz();
-
-  const mensaje = new SpeechSynthesisUtterance(texto);
-  mensaje.onend = () => {
-    if (typeof alTerminar === 'function') alTerminar();
-  };
-  mensaje.onerror = () => {
-    if (typeof alTerminar === 'function') alTerminar();
-  };
-
-  if (vozDisponible) {
-    mensaje.voice = vozDisponible;
-  }
-
-  mensaje.lang = vozDisponible?.lang || 'es-ES';
-  mensaje.pitch = 1;
-  mensaje.rate = 1;
-  mensaje.volume = 1;
-
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(mensaje);
-}
-
-/* Mensajes visuales temporales. */
-function mostrar(texto, tipo = '', duracion = 2500) {
-  const caja = $('resultado');
-
-  caja.textContent = texto;
-  caja.className = tipo;
-  caja.style.display = 'block';
-
-  clearTimeout(temporizadorMensaje);
-
-  temporizadorMensaje = setTimeout(() => {
-    caja.style.display = 'none';
-    caja.className = '';
-  }, duracion);
-}
-
-function actualizarContador() {
-  $('contador').textContent = total + ' leídos';
-}
-
-/*
- * Libera el QR cuando deja de detectarse durante un tiempo.
- * Así, si se retira y se vuelve a presentar, se considera
- * una nueva lectura y se comprueba si ya estaba registrado.
- */
-function programarLiberacion(codigo) {
-  clearTimeout(temporizadorLiberacion);
-
-  temporizadorLiberacion = setTimeout(() => {
-    if (codigoEnLectura === codigo) {
-      codigoEnLectura = '';
-    }
-  }, 1800);
-}
-
-/* Procesamiento de cada lectura aceptada. */
-function procesarQR(textoQR) {
-  const codigo = String(textoQR || '').trim();
-
-  if (!codigo || !activo || bloqueadoPorAudio) return;
-
-  bloqueadoPorAudio = true;
-
-  /*
-   * Mantiene bloqueada la lectura mientras el mismo QR
-   * continúa visible ante la cámara.
-   */
-  if (codigoEnLectura === codigo) {
-    programarLiberacion(codigo);
-    return;
-  }
-
-  codigoEnLectura = codigo;
-  programarLiberacion(codigo);
-
-  /* Si el QR contiene un enlace web, abrirlo en la pestaña de fondo. */
-  abrirEnlaceQR(codigo);
-
-  total++;
-  actualizarContador();
-
-  const fecha = hoy();
-  const fechaRegistro = registrosHoy.get(codigo);
-
-  const liberarLector = () => {
-    bloqueadoPorAudio = false;
-  };
-
-  if (fechaRegistro === fecha) {
-    mostrar('Ya se encuentra registrado ❗', 'repetido', 3000);
-    hablar('Ya se encuentra registrado', liberarLector);
-  } else {
-    registrosHoy.set(codigo, fecha);
-
-    mostrar('Asistencia registrada correctamente', 'exito', 2500);
-    hablar('Asistencia registrada', liberarLector);
-  }
-
-}
-
-/* Inicio del escáner. */
-async function iniciarLector() {
-  if (activo || iniciando) return;
-
-  iniciando = true;
-  $('btnIniciar').disabled = true;
-  $('estado').textContent = 'Activando cámara trasera…';
-
-  try {
-    if (!window.isSecureContext ||
-        !navigator.mediaDevices?.getUserMedia) {
-      throw new Error(
-        'Abre esta página mediante HTTPS y permite el acceso a la cámara.'
-      );
-    }
-
-    if (typeof Html5Qrcode === 'undefined') {
-      throw new Error(
-        'No se pudo cargar el lector QR. Comprueba tu conexión a Internet.'
-      );
-    }
-
-    if (reader) {
-      try {
-        await reader.stop();
-      } catch (_) {}
-
-      try {
-        reader.clear();
-      } catch (_) {}
-
-      reader = null;
-    }
-
-    const lectorDiv = $('lector');
-    lectorDiv.innerHTML = '';
-
-    reader = new Html5Qrcode('lector', {
-      verbose: false,
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.QR_CODE
-      ],
-      experimentalFeatures: {
-        useBarCodeDetectorIfSupported: true
+  <head>
+    <meta charset="utf-8" />
+    <title>Registro de Asistencia - Modo Profesor</title>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  </head>
+
+  <body style="font-family:sans-serif; text-align:center;">
+    <h2>📷 Escáner QR - Modo Profesor</h2>
+
+    <!-- Botón inicial (necesario para desbloquear audio en móviles) -->
+    <button id="btnIniciar" style="padding:12px 25px; font-size:16px; margin:20px;">
+      🔊 Iniciar escáner
+    </button>
+
+    <div id="lector" style="width: 350px; margin:auto; display:none;"></div>
+    <p id="msg" style="font-size: 18px; font-weight: bold; color: green;"></p>
+
+    <script>
+      let reader;
+      const registrosHoy = {};
+      let vozDisponible = null;
+
+      // Obtener fecha actual
+      function hoy() {
+        const d = new Date();
+        return d.toISOString().split("T")[0];
       }
-    });
 
-    const lado = Math.max(150, Math.floor(Math.min(window.innerWidth * 0.78, window.innerHeight * 0.34, 360)));
-
-    const config = {
-      fps: 20,
-      qrbox: {
-        width: lado,
-        height: lado
-      },
-      aspectRatio: 1,
-      disableFlip: false,
-      videoConstraints: {
-        facingMode: 'environment',
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
+      // Configurar voz en español
+      function cargarVoz() {
+        const voces = window.speechSynthesis.getVoices();
+        vozDisponible =
+          voces.find(v => v.lang.startsWith("es")) ||
+          voces.find(v => v.lang === "es-ES") ||
+          voces[0];
       }
-    };
 
-    await reader.start(
-      { facingMode: 'environment' },
-      config,
+      window.speechSynthesis.onvoiceschanged = cargarVoz;
 
-      /* No detener la cámara después de cada lectura. */
-      textoQR => {
-        procesarQR(textoQR);
-      },
+      // 🔊 Función para hablar texto
+      function hablar(texto) {
+        if (!vozDisponible) cargarVoz();
+        const msg = new SpeechSynthesisUtterance(texto);
+        msg.voice = vozDisponible;
+        msg.lang = "es-ES";
+        msg.pitch = 1;
+        msg.rate = 1;
+        window.speechSynthesis.cancel(); // detener voces previas
+        window.speechSynthesis.speak(msg);
+      }
 
-      /* Los errores normales de detección se ignoran. */
-      () => {}
-    );
+      async function iniciarLector() {
+        document.getElementById("lector").style.display = "block";
+        const lectorDiv = document.getElementById("lector");
+        lectorDiv.innerHTML = "";
+        reader = new Html5Qrcode("lector");
 
-    // Fuerza reproducción inline en móviles compatibles.
-    const video = $('lector').querySelector('video');
-    if (video) {
-      video.setAttribute('playsinline', 'true');
-      video.setAttribute('autoplay', 'true');
-      video.muted = true;
-      video.playsInline = true;
-      try { await video.play(); } catch (_) {}
-    }
+        reader
+          .start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: 250 },
+            async textoQR => {
+              reader.stop();
 
-    activo = true;
-    linterna = false;
+              try {
+                const fecha = hoy();
+                const claveQR = textoQR.trim();
+                const msg = document.getElementById("msg");
 
-    $('btnIniciar').classList.add('oculto');
-    $('estado').textContent = 'Cámara activa';
-    $('instruccion').textContent =
-      'Coloca el código dentro del recuadro';
+                if (registrosHoy[claveQR] === fecha) {
+                  msg.innerText = "Ya se encuentra registrado ❗";
+                  hablar("Ya se encuentra registrado");
+                } else {
+                  registrosHoy[claveQR] = fecha;
+                  msg.innerText = "Asistencia registrada ✅";
+                  hablar("Asistencia registrada");
 
-  } catch (e) {
-    console.error('Error al iniciar el lector:', e);
+                  // Solo abre enlaces válidos la primera vez
+                  if (/^https?:\/\//i.test(claveQR)) {
+                    const win = window.open(claveQR, "_blank");
+                    setTimeout(() => {
+                      if (win && !win.closed) win.close();
+                    }, 1000);
+                  }
+                }
 
-    activo = false;
-    $('estado').textContent = 'No se pudo iniciar la cámara';
+                // Reiniciar el lector luego de unos segundos
+                setTimeout(() => {
+                  msg.innerText = "";
+                  iniciarLector();
+                }, 2000);
+              } catch (err) {
+                console.error("Error al procesar QR:", err);
+                hablar("Ocurrió un error al procesar el código");
+                iniciarLector();
+              }
+            },
+            error => {}
+          )
+          .catch(err => {
+            alert("Error al acceder a la cámara: " + err);
+          });
+      }
 
-    let mensajeError = e.message || String(e);
-    if (e && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) {
-      mensajeError = 'Permiso de cámara denegado. En Chrome, abre los ajustes del sitio y permite la Cámara; después vuelve a pulsar Iniciar escáner.';
-    } else if (e && (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError')) {
-      mensajeError = 'No se encontró una cámara disponible en este dispositivo.';
-    } else if (e && (e.name === 'NotReadableError' || e.name === 'TrackStartError')) {
-      mensajeError = 'La cámara está siendo utilizada por otra aplicación. Ciérrala e inténtalo de nuevo.';
-    }
-    mostrar(mensajeError, '', 6000);
-
-    if (reader) {
-      try {
-        await reader.stop();
-      } catch (_) {}
-
-      try {
-        reader.clear();
-      } catch (_) {}
-
-      reader = null;
-    }
-
-    $('btnIniciar').classList.remove('oculto');
-
-  } finally {
-    iniciando = false;
-    $('btnIniciar').disabled = false;
-  }
-}
-
-/* Control de la linterna. */
-async function alternarLinterna() {
-  if (!reader || !activo) {
-    mostrar('Inicia primero el escáner.');
-    return;
-  }
-
-  try {
-    const nuevoEstado = !linterna;
-
-    await reader.applyVideoConstraints({
-      advanced: [{ torch: nuevoEstado }]
-    });
-
-    linterna = nuevoEstado;
-
-    $('btnLinterna').querySelector('.icono').textContent =
-      linterna ? '💡' : '🔦';
-
-    mostrar(
-      linterna ? 'Linterna encendida' : 'Linterna apagada'
-    );
-
-  } catch (e) {
-    linterna = false;
-
-    $('btnLinterna').querySelector('.icono').textContent = '🔦';
-
-    mostrar('La linterna no está disponible en este dispositivo.');
-  }
-}
-
-/* Activación inicial mediante interacción del usuario. */
-$('btnIniciar').addEventListener('click', async () => {
-  if (activo || iniciando) return;
-
-  hablar(
-    'Escáner activado. Puede comenzar a registrar asistencias.'
-  );
-
-  await iniciarLector();
-});
-
-/* Botón de escaneo. */
-$('botonQR').addEventListener('click', () => {
-  if (activo) {
-    mostrar('Apunta la cámara al código QR.');
-  } else {
-    iniciarLector();
-  }
-});
-
-/* Botón de linterna. */
-$('btnLinterna').addEventListener('click', alternarLinterna);
-
-/* Recuperación al regresar a la pestaña del lector. */
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) return;
-
-  if (activo) {
-    $('estado').textContent = 'Cámara activa';
-    $('instruccion').textContent =
-      'Coloca el código dentro del recuadro';
-  } else if (!iniciando) {
-    $('estado').textContent =
-      'Pulsa Iniciar escáner para activar la cámara.';
-  }
-});
-
-/* Limpiar temporizadores al abandonar la página. */
-window.addEventListener('pagehide', () => {
-  clearTimeout(temporizadorMensaje);
-  clearTimeout(temporizadorLiberacion);
-});
-</script>
-</body>
+      // Botón inicial para activar sonido y cámara
+      document.getElementById("btnIniciar").addEventListener("click", () => {
+        hablar("Escáner activado, puede comenzar a registrar asistencias.");
+        document.getElementById("btnIniciar").style.display = "none";
+        iniciarLector();
+      });
+    </script>
+  </body>
 </html>
+
+
+
+
+
 
