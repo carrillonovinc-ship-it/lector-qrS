@@ -19,13 +19,10 @@ html, body {
   margin: 0;
   width: 100%;
   height: 100%;
-  height: 100dvh;
   overflow: hidden;
-  overscroll-behavior: none;
   background: #111;
   color: white;
   font-family: Arial, Helvetica, sans-serif;
-  touch-action: manipulation;
 }
 
 #app {
@@ -38,10 +35,7 @@ html, body {
 #lector {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
   background: #111;
-  overflow: hidden;
 }
 
 #lector video {
@@ -113,15 +107,15 @@ html, body {
 
 #marco {
   position: absolute;
-  width: min(84vw, 360px, 40dvh);
-  height: min(84vw, 360px, 40dvh);
-  top: 42%;
+  width: min(88vw, 430px);
+  height: min(88vw, 430px);
+  max-height: 48vh;
+  top: 36%;
   left: 50%;
   transform: translate(-50%, -50%);
   border: 1px solid rgba(255,255,255,.25);
   background: rgba(255,255,255,.025);
   box-shadow: 0 0 0 100vmax rgba(0,0,0,.13);
-  overflow: hidden;
 }
 
 .esquina {
@@ -161,24 +155,27 @@ html, body {
 
 #linea {
   position: absolute;
-  top: 0;
-  left: 3%;
-  right: 3%;
+  top: 50%;
+  left: 2%;
+  right: 2%;
   height: 2px;
   background: #00ff66;
   box-shadow: 0 0 7px #00ff66, 0 0 14px #00ff66;
   animation: barrido 1.8s ease-in-out infinite alternate;
-  pointer-events: none;
 }
 
 @keyframes barrido {
-  from { top: 0; }
-  to { top: calc(100% - 2px); }
+  from {
+    transform: translateY(-min(35vw, 150px));
+  }
+  to {
+    transform: translateY(min(35vw, 150px));
+  }
 }
 
 #instruccion {
   position: absolute;
-  top: calc(42% + min(42vw, 180px) + 16px);
+  top: calc(36% + min(44vw, 215px) + 16px);
   width: 100%;
   padding: 0 14px;
   text-align: center;
@@ -188,7 +185,7 @@ html, body {
 
 #zonaInferior {
   position: absolute;
-  bottom: calc(3% + env(safe-area-inset-bottom));
+  bottom: calc(5% + env(safe-area-inset-bottom));
   left: 0;
   width: 100%;
   display: flex;
@@ -276,22 +273,20 @@ button:disabled {
 
 @media (max-height: 600px) {
   #marco {
-    top: 39%;
-    width: min(62vw, 260px, 38dvh);
-    height: min(62vw, 260px, 38dvh);
+    top: 40%;
+    width: min(66vw, 300px);
+    height: min(66vw, 300px);
+    max-height: 43vh;
   }
 
   #instruccion {
-    top: calc(39% + min(31vw, 130px, 19dvh) + 12px);
-    font-size: 13px;
+    top: calc(40% + min(33vw, 150px) + 12px);
+    font-size: 14px;
   }
 
   #zonaInferior {
-    bottom: calc(1% + env(safe-area-inset-bottom));
-    gap: 24px;
+    bottom: calc(2% + env(safe-area-inset-bottom));
   }
-
-  #estado { top: 9%; font-size: 13px; }
 }
 </style>
 </head>
@@ -359,6 +354,7 @@ let vozDisponible = null;
 let temporizadorMensaje = null;
 let temporizadorLiberacion = null;
 let ultimoCodigo = '';
+let ventanaEnlaces = null;
 
 /*
  * Registros realizados durante esta sesión.
@@ -442,6 +438,75 @@ function actualizarContador() {
   $('contador').textContent = total + ' leídos';
 }
 
+/* Solo se aceptan direcciones HTTP y HTTPS. */
+function esURL(texto) {
+  try {
+    const u = new URL(texto);
+
+    return (
+      (u.protocol === 'https:' || u.protocol === 'http:') &&
+      !!u.hostname
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
+/*
+ * Prepara una pestaña secundaria desde el botón inicial,
+ * cuando todavía existe una acción directa del usuario.
+ *
+ * El navegador puede impedirla por sus políticas.
+ * No es posible obligar a Chrome a abrir pestañas en segundo plano.
+ */
+function prepararVentanaEnlaces() {
+  try {
+    if (!ventanaEnlaces || ventanaEnlaces.closed) {
+      ventanaEnlaces = window.open(
+        'about:blank',
+        'ventanaEnlacesQR'
+      );
+    }
+  } catch (e) {
+    console.warn('No se pudo preparar la pestaña:', e);
+  }
+}
+
+/*
+ * Envía el enlace a la pestaña secundaria.
+ * Se reutiliza la misma pestaña para no crear una nueva
+ * por cada lectura.
+ */
+function abrirEnlace(url) {
+  if (!esURL(url)) return false;
+
+  try {
+    if (!ventanaEnlaces || ventanaEnlaces.closed) {
+      prepararVentanaEnlaces();
+    }
+
+    if (ventanaEnlaces && !ventanaEnlaces.closed) {
+      ventanaEnlaces.location.href = url;
+      return true;
+    }
+
+    /*
+     * Intento adicional. Puede ser bloqueado por Chrome
+     * porque la lectura automática no es un clic del usuario.
+     */
+    const nueva = window.open(url, '_blank');
+
+    if (nueva) {
+      ventanaEnlaces = nueva;
+      return true;
+    }
+  } catch (e) {
+    console.warn('El navegador impidió abrir el enlace:', e);
+  }
+
+  return false;
+}
+
 /*
  * Libera el QR cuando deja de detectarse durante un tiempo.
  * Así, si se retira y se vuelve a presentar, se considera
@@ -491,6 +556,23 @@ function procesarQR(textoQR) {
     hablar('Asistencia registrada');
   }
 
+  /*
+   * Si contiene un enlace, se intenta abrir tanto en la
+   * primera lectura como cuando el mismo QR se vuelve
+   * a presentar posteriormente.
+   */
+  if (esURL(codigo)) {
+    const abierto = abrirEnlace(codigo);
+
+    if (!abierto) {
+      mostrar(
+        'QR leído. Chrome bloqueó la apertura automática. ' +
+        'Permite las ventanas emergentes para abrir el enlace.',
+        '',
+        4500
+      );
+    }
+  }
 }
 
 /* Inicio del escáner. */
@@ -540,7 +622,16 @@ async function iniciarLector() {
       }
     });
 
-    const lado = Math.max(150, Math.floor(Math.min(window.innerWidth * 0.78, window.innerHeight * 0.34, 360)));
+    const lado = Math.max(
+      160,
+      Math.floor(
+        Math.min(
+          window.innerWidth * 0.84,
+          window.innerHeight * 0.46,
+          420
+        )
+      )
+    );
 
     const config = {
       fps: 20,
@@ -553,7 +644,7 @@ async function iniciarLector() {
     };
 
     await reader.start(
-      { facingMode: 'environment' },
+      { facingMode: { exact: 'environment' } },
       config,
 
       /* No detener la cámara después de cada lectura. */
@@ -564,16 +655,6 @@ async function iniciarLector() {
       /* Los errores normales de detección se ignoran. */
       () => {}
     );
-
-    // Fuerza reproducción inline en móviles compatibles.
-    const video = $('lector').querySelector('video');
-    if (video) {
-      video.setAttribute('playsinline', 'true');
-      video.setAttribute('autoplay', 'true');
-      video.muted = true;
-      video.playsInline = true;
-      try { await video.play(); } catch (_) {}
-    }
 
     activo = true;
     linterna = false;
@@ -589,15 +670,11 @@ async function iniciarLector() {
     activo = false;
     $('estado').textContent = 'No se pudo iniciar la cámara';
 
-    let mensajeError = e.message || String(e);
-    if (e && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) {
-      mensajeError = 'Permiso de cámara denegado. En Chrome, abre los ajustes del sitio y permite la Cámara; después vuelve a pulsar Iniciar escáner.';
-    } else if (e && (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError')) {
-      mensajeError = 'No se encontró una cámara disponible en este dispositivo.';
-    } else if (e && (e.name === 'NotReadableError' || e.name === 'TrackStartError')) {
-      mensajeError = 'La cámara está siendo utilizada por otra aplicación. Ciérrala e inténtalo de nuevo.';
-    }
-    mostrar(mensajeError, '', 6000);
+    mostrar(
+      e.message || String(e),
+      '',
+      4500
+    );
 
     if (reader) {
       try {
@@ -655,6 +732,12 @@ async function alternarLinterna() {
 $('btnIniciar').addEventListener('click', async () => {
   if (activo || iniciando) return;
 
+  /*
+   * Se intenta preparar la pestaña secundaria mientras
+   * el navegador todavía reconoce el clic del usuario.
+   */
+  prepararVentanaEnlaces();
+
   hablar(
     'Escáner activado. Puede comenzar a registrar asistencias.'
   );
@@ -684,7 +767,7 @@ document.addEventListener('visibilitychange', () => {
       'Coloca el código dentro del recuadro';
   } else if (!iniciando) {
     $('estado').textContent =
-      'Pulsa Iniciar escáner para activar la cámara.';
+      'Pulsa iniciar para activar la cámara.';
   }
 });
 
@@ -696,3 +779,4 @@ window.addEventListener('pagehide', () => {
 </script>
 </body>
 </html>
+
