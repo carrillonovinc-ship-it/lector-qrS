@@ -637,8 +637,26 @@ async function iniciarLector() {
       disableFlip: false
     };
 
+    // Selecciona primero una cámara física trasera y pasa su ID como texto.
+    // Esto evita el error de html5-qrcode cuando recibe un objeto de cámara
+    // con varias claves (cameraIdOrConfig).
+    let camaras = [];
+    try {
+      camaras = await Html5Qrcode.getCameras();
+    } catch (errorCamaras) {
+      console.warn('No se pudieron enumerar las cámaras inicialmente:', errorCamaras);
+    }
+
+    if (!camaras || camaras.length === 0) {
+      throw new Error('No se detectaron cámaras. Permite el acceso a la cámara y vuelve a intentar.');
+    }
+
+    const camaraTrasera = camaras.find(c =>
+      /back|rear|environment|trasera|posterior|world/i.test(c.label || '')
+    ) || camaras[camaras.length - 1];
+
     await reader.start(
-      { facingMode: 'environment' },
+      camaraTrasera.id,
       config,
 
       /* No detener la cámara después de cada lectura. */
