@@ -579,57 +579,15 @@ async function iniciarLector() {
         height: lado
       },
       aspectRatio: 1,
-      disableFlip: false,
-      // Solicita una resolución alta para mejorar la nitidez del QR.
-      videoConstraints: {
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-        frameRate: { ideal: 30, max: 30 }
-      }
+      disableFlip: false
     };
 
-    // Identifica primero la cámara trasera real y usa su deviceId explícito.
-    // Esto evita que algunos navegadores seleccionen la cámara frontal.
-    let camaraTraseraId = null;
-    let flujoPrueba = null;
-
-    try {
-      flujoPrueba = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { exact: 'environment' },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 30, max: 30 }
-        },
-        audio: false
-      });
-      const pistaPrueba = flujoPrueba.getVideoTracks()[0];
-      if (pistaPrueba) {
-        camaraTraseraId = pistaPrueba.getSettings().deviceId || null;
-      }
-    } catch (errorCamaraTrasera) {
-      console.warn('No se pudo identificar la cámara trasera por facingMode:', errorCamaraTrasera);
-    } finally {
-      if (flujoPrueba) {
-        flujoPrueba.getTracks().forEach(pista => pista.stop());
-      }
-    }
-
-    // Si el navegador no entrega deviceId, busca una cámara cuyo nombre indique
-    // que es trasera; deja facingMode environment como último recurso.
-    if (!camaraTraseraId) {
-      try {
-        const dispositivos = await navigator.mediaDevices.enumerateDevices();
-        const camaras = dispositivos.filter(d => d.kind === 'videoinput');
-        const trasera = camaras.find(d => /back|rear|environment|trasera|posterior|背面|后置/i.test(d.label));
-        if (trasera) camaraTraseraId = trasera.deviceId;
-      } catch (errorListaCamaras) {
-        console.warn('No se pudieron enumerar las cámaras:', errorListaCamaras);
-      }
-    }
-
     await reader.start(
-      camaraTraseraId || { facingMode: { exact: 'environment' } },
+      {
+        facingMode: { exact: 'environment' },
+        width: { ideal: 3840 },
+        height: { ideal: 2160 }
+      },
       config,
 
       /* No detener la cámara después de cada lectura. */
@@ -648,6 +606,27 @@ async function iniciarLector() {
       video.setAttribute('autoplay', 'true');
       video.muted = true;
       video.playsInline = true;
+
+      // Solicita la mayor resolución disponible en la cámara trasera.
+      // No cambia el resto del funcionamiento del lector.
+      try {
+        const pista = video.srcObject?.getVideoTracks?.()[0];
+        if (pista) {
+          const capacidades = pista.getCapabilities ? pista.getCapabilities() : {};
+          const restricciones = {};
+          if (capacidades.width?.max) restricciones.width = { ideal: capacidades.width.max };
+          if (capacidades.height?.max) restricciones.height = { ideal: capacidades.height.max };
+          if (capacidades.focusMode?.includes('continuous')) {
+            restricciones.focusMode = 'continuous';
+          }
+          if (Object.keys(restricciones).length) {
+            await pista.applyConstraints(restricciones);
+          }
+        }
+      } catch (e) {
+        console.warn('La cámara no admite resolución o enfoque mejorados:', e);
+      }
+
       try { await video.play(); } catch (_) {}
     }
 
