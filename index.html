@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111111">
 <title>Registro de Asistencia - Modo Profesor</title>
+
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
 <style>
@@ -156,23 +157,23 @@ html, body {
   border-width: 0 4px 4px 0;
 }
 
-/* LÍNEA VERDE: MOVIMIENTO CONTINUO, SUAVE Y UNIFORME */
+/* Línea verde animada */
+
 #linea {
   position: absolute;
   top: 0;
   left: 3%;
   right: 3%;
-  height: 3px;
+  height: 2px;
   background: #00ff66;
   box-shadow: 0 0 7px #00ff66, 0 0 14px #00ff66;
   animation: barrido 2.2s linear infinite alternate;
   pointer-events: none;
-  will-change: top;
 }
 
 @keyframes barrido {
   from { top: 0; }
-  to { top: calc(100% - 3px); }
+  to { top: calc(100% - 2px); }
 }
 
 #instruccion {
@@ -193,7 +194,7 @@ html, body {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 22px;
+  gap: 36px;
   pointer-events: auto;
 }
 
@@ -205,13 +206,13 @@ html, body {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
-  padding: 8px 10px;
+  font-size: 14px;
+  padding: 8px 14px;
   cursor: pointer;
 }
 
 .icono {
-  font-size: 28px;
+  font-size: 30px;
   line-height: 1;
 }
 
@@ -221,7 +222,7 @@ html, body {
 }
 
 #btnApagar {
-  color: #ff5555;
+  color: #ff7777;
   font-weight: bold;
 }
 
@@ -292,22 +293,10 @@ button:disabled {
 
   #zonaInferior {
     bottom: calc(1% + env(safe-area-inset-bottom));
-    gap: 12px;
+    gap: 24px;
   }
 
-  .control {
-    padding: 6px;
-    font-size: 12px;
-  }
-
-  .icono {
-    font-size: 25px;
-  }
-
-  #estado {
-    top: 9%;
-    font-size: 13px;
-  }
+  #estado { top: 9%; font-size: 13px; }
 }
 </style>
 </head>
@@ -318,6 +307,7 @@ button:disabled {
   <div id="lector"></div>
 
   <div id="interfaz">
+
     <div id="barra">
       <span id="titulo">Escáner QR - Profesor</span>
       <span id="contador">0 leídos</span>
@@ -373,26 +363,108 @@ const $ = id => document.getElementById(id);
 let reader = null;
 let activo = false;
 let iniciando = false;
-let apagando = false;
 let linterna = false;
 let total = 0;
 let vozDisponible = null;
 let temporizadorMensaje = null;
 let temporizadorLiberacion = null;
-let codigoEnLectura = '';
+let ultimoCodigo = '';
+let colaEnlacesQR = [];
+let procesandoEnlacesQR = false;
+let enlacesPendientes = 0;
 
+/*
+ * Encola cada enlace QR para enviarlo en segundo plano.
+ * No abre pestañas ni abandona la pantalla del lector.
+ * La cola procesa los enlaces uno por uno para evitar
+ * que varias solicitudes se pisen entre sí.
+ */
+function abrirEnlaceQR(texto) {
+  const enlace = String(texto || '').trim();
+  if (!/^https?:\/\//i.test(enlace)) return;
+
+  colaEnlacesQR.push({ enlace, intentos: 0 });
+  enlacesPendientes++;
+  actualizarEstadoCola();
+  procesarColaEnlacesQR();
+}
+
+function actualizarEstadoCola() {
+  if (!activo && !iniciando) return;
+  if (enlacesPendientes > 0) {
+    $('estado').textContent = `Cámara activa · ${enlacesPendientes} enlace(s) en proceso`;
+  } else {
+    $('estado').textContent = 'Cámara activa';
+  }
+}
+
+async function procesarColaEnlacesQR() {
+  if (procesandoEnlacesQR) return;
+  procesandoEnlacesQR = true;
+
+  try {
+    while (colaEnlacesQR.length > 0) {
+      const trabajo = colaEnlacesQR[0];
+      try {
+        /*
+         * no-cors permite disparar el GET sin leer la respuesta
+         * entre dominios. El navegador no cambia de pestaña.
+         */
+        await fetch(trabajo.enlace, {
+          method: 'GET',
+          mode: 'no-cors',
+          cache: 'no-store',
+          redirect: 'follow',
+          credentials: 'omit'
+        });
+
+        colaEnlacesQR.shift();
+        enlacesPendientes = Math.max(0, enlacesPendientes - 1);
+        actualizarEstadoCola();
+      } catch (error) {
+        trabajo.intentos++;
+        console.warn('No se pudo enviar el enlace QR; se reintentará:', error);
+
+        if (trabajo.intentos < 3) {
+          await new Promise(resolve => setTimeout(resolve, 700 * trabajo.intentos));
+        } else {
+          colaEnlacesQR.shift();
+          enlacesPendientes = Math.max(0, enlacesPendientes - 1);
+          actualizarEstadoCola();
+          mostrar('No se pudo enviar un enlace. Comprueba la conexión a Internet.', '', 4500);
+        }
+      }
+    }
+  } finally {
+    procesandoEnlacesQR = false;
+    actualizarEstadoCola();
+    if (colaEnlacesQR.length > 0) procesarColaEnlacesQR();
+  }
+}
+
+/*
+ * Registros realizados durante esta sesión.
+ * La clave es el contenido completo del QR.
+ */
 const registrosHoy = new Map();
 
-/* Fecha local */
+/*
+ * Evita que un mismo QR detectado continuamente
+ * provoque múltiples registros y anuncios.
+ */
+let codigoEnLectura = '';
+
+/* Fecha local, sin desplazamiento UTC. */
 function hoy() {
   const d = new Date();
   const anio = d.getFullYear();
   const mes = String(d.getMonth() + 1).padStart(2, '0');
   const dia = String(d.getDate()).padStart(2, '0');
+
   return `${anio}-${mes}-${dia}`;
 }
 
-/* Selección de voz española */
+/* Selección de voz española. */
 function cargarVoz() {
   if (!('speechSynthesis' in window)) return;
 
@@ -400,7 +472,7 @@ function cargarVoz() {
 
   vozDisponible =
     voces.find(v => /^es(-|_)/i.test(v.lang) &&
-      /BO|ES|MX|AR|419/i.test(v.lang)) ||
+                    /BO|ES|MX|AR|419/i.test(v.lang)) ||
     voces.find(v => /^es/i.test(v.lang)) ||
     voces[0] ||
     null;
@@ -411,7 +483,7 @@ if ('speechSynthesis' in window) {
   window.speechSynthesis.onvoiceschanged = cargarVoz;
 }
 
-/* Anuncio por voz */
+/* Anuncio por voz. */
 function hablar(texto) {
   if (!('speechSynthesis' in window)) return;
 
@@ -419,7 +491,9 @@ function hablar(texto) {
 
   const mensaje = new SpeechSynthesisUtterance(texto);
 
-  if (vozDisponible) mensaje.voice = vozDisponible;
+  if (vozDisponible) {
+    mensaje.voice = vozDisponible;
+  }
 
   mensaje.lang = vozDisponible?.lang || 'es-ES';
   mensaje.pitch = 1;
@@ -430,7 +504,7 @@ function hablar(texto) {
   window.speechSynthesis.speak(mensaje);
 }
 
-/* Mensajes visuales */
+/* Mensajes visuales temporales. */
 function mostrar(texto, tipo = '', duracion = 2500) {
   const caja = $('resultado');
 
@@ -450,7 +524,11 @@ function actualizarContador() {
   $('contador').textContent = total + ' leídos';
 }
 
-/* Evita lecturas continuas del mismo QR */
+/*
+ * Libera el QR cuando deja de detectarse durante un tiempo.
+ * Así, si se retira y se vuelve a presentar, se considera
+ * una nueva lectura y se comprueba si ya estaba registrado.
+ */
 function programarLiberacion(codigo) {
   clearTimeout(temporizadorLiberacion);
 
@@ -461,12 +539,16 @@ function programarLiberacion(codigo) {
   }, 1800);
 }
 
-/* Procesamiento inmediato del QR */
+/* Procesamiento de cada lectura aceptada. */
 function procesarQR(textoQR) {
   const codigo = String(textoQR || '').trim();
 
-  if (!codigo || !activo || apagando) return;
+  if (!codigo || !activo) return;
 
+  /*
+   * Mantiene bloqueada la lectura mientras el mismo QR
+   * continúa visible ante la cámara.
+   */
   if (codigoEnLectura === codigo) {
     programarLiberacion(codigo);
     return;
@@ -475,28 +557,34 @@ function procesarQR(textoQR) {
   codigoEnLectura = codigo;
   programarLiberacion(codigo);
 
+  /* Si el QR contiene un enlace web, abrirlo en la pestaña de fondo. */
+  abrirEnlaceQR(codigo);
+
   total++;
   actualizarContador();
 
   const fecha = hoy();
+  const fechaRegistro = registrosHoy.get(codigo);
 
-  if (registrosHoy.get(codigo) === fecha) {
+  if (fechaRegistro === fecha) {
     mostrar('Ya se encuentra registrado ❗', 'repetido', 3000);
     hablar('Ya se encuentra registrado');
   } else {
     registrosHoy.set(codigo, fecha);
-    mostrar('Asistencia registrada correctamente', 'exito', 2500);
-    hablar('Asistencia registrada');
+
+    mostrar('QR leído y enviado al sistema en segundo plano', 'exito', 2500);
+    hablar('Código leído');
   }
+
 }
 
-/* Iniciar cámara trasera en alta resolución */
+/* Inicio del escáner. */
 async function iniciarLector() {
-  if (activo || iniciando || apagando) return;
+  if (activo || iniciando) return;
 
   iniciando = true;
   $('btnIniciar').disabled = true;
-  $('estado').textContent = 'Activando cámara trasera en alta resolución…';
+  $('estado').textContent = 'Activando cámara trasera…';
 
   try {
     if (!window.isSecureContext ||
@@ -524,7 +612,8 @@ async function iniciarLector() {
       reader = null;
     }
 
-    $('lector').innerHTML = '';
+    const lectorDiv = $('lector');
+    lectorDiv.innerHTML = '';
 
     reader = new Html5Qrcode('lector', {
       verbose: false,
@@ -536,66 +625,64 @@ async function iniciarLector() {
       }
     });
 
+    const lado = Math.max(150, Math.floor(Math.min(window.innerWidth * 0.78, window.innerHeight * 0.34, 360)));
+
     const config = {
-      fps: 30,
-      qrbox: function(ancho, alto) {
-        const lado = Math.floor(Math.min(ancho, alto) * 0.85);
-        return { width: lado, height: lado };
+      fps: 20,
+      qrbox: {
+        width: lado,
+        height: lado
       },
       aspectRatio: 1,
-      disableFlip: true,
-      videoConstraints: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-        frameRate: { ideal: 30, max: 60 }
-      }
+      disableFlip: false
     };
 
     await reader.start(
-      { facingMode: 'environment' },
+      {
+        facingMode: { exact: 'environment' },
+        width: { ideal: 3840 },
+        height: { ideal: 2160 }
+      },
       config,
 
+      /* No detener la cámara después de cada lectura. */
       textoQR => {
         procesarQR(textoQR);
       },
 
+      /* Los errores normales de detección se ignoran. */
       () => {}
     );
 
+    // Fuerza reproducción inline en móviles compatibles.
     const video = $('lector').querySelector('video');
-
     if (video) {
       video.setAttribute('playsinline', 'true');
       video.setAttribute('autoplay', 'true');
-      video.setAttribute('webkit-playsinline', 'true');
       video.muted = true;
       video.playsInline = true;
 
-      const pistas = video.srcObject?.getVideoTracks() || [];
-
-      if (pistas.length) {
-        const pista = pistas[0];
-
-        try {
-          await pista.applyConstraints({
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-            frameRate: { ideal: 30, max: 60 }
-          });
-        } catch (errorResolucion) {
-          console.warn('Se mantiene la resolución compatible.', errorResolucion);
+      // Solicita la mayor resolución disponible en la cámara trasera.
+      // No cambia el resto del funcionamiento del lector.
+      try {
+        const pista = video.srcObject?.getVideoTracks?.()[0];
+        if (pista) {
+          const capacidades = pista.getCapabilities ? pista.getCapabilities() : {};
+          const restricciones = {};
+          if (capacidades.width?.max) restricciones.width = { ideal: capacidades.width.max };
+          if (capacidades.height?.max) restricciones.height = { ideal: capacidades.height.max };
+          if (capacidades.focusMode?.includes('continuous')) {
+            restricciones.focusMode = 'continuous';
+          }
+          if (Object.keys(restricciones).length) {
+            await pista.applyConstraints(restricciones);
+          }
         }
-
-        const ajustes = pista.getSettings();
-        console.log('Cámara:', ajustes.facingMode);
-        console.log('Resolución:', ajustes.width, 'x', ajustes.height);
-        console.log('FPS:', ajustes.frameRate);
+      } catch (e) {
+        console.warn('La cámara no admite resolución o enfoque mejorados:', e);
       }
 
-      try {
-        await video.play();
-      } catch (_) {}
+      try { await video.play(); } catch (_) {}
     }
 
     activo = true;
@@ -603,9 +690,9 @@ async function iniciarLector() {
 
     $('btnIniciar').classList.add('oculto');
     $('btnApagar').classList.remove('oculto');
-    $('btnLinterna').querySelector('.icono').textContent = '🔦';
-    $('estado').textContent = 'Cámara trasera activa';
-    $('instruccion').textContent = 'Coloca el código dentro del recuadro';
+    actualizarEstadoCola();
+    $('instruccion').textContent =
+      'Coloca el código dentro del recuadro';
 
   } catch (e) {
     console.error('Error al iniciar el lector:', e);
@@ -614,20 +701,13 @@ async function iniciarLector() {
     $('estado').textContent = 'No se pudo iniciar la cámara';
 
     let mensajeError = e.message || String(e);
-
-    if (e.name === 'NotAllowedError' ||
-        e.name === 'PermissionDeniedError') {
-      mensajeError =
-        'Permiso de cámara denegado. Abre los ajustes del sitio en Chrome y permite el acceso a la cámara.';
-    } else if (e.name === 'NotFoundError' ||
-               e.name === 'DevicesNotFoundError') {
+    if (e && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) {
+      mensajeError = 'Permiso de cámara denegado. En Chrome, abre los ajustes del sitio y permite la Cámara; después vuelve a pulsar Iniciar escáner.';
+    } else if (e && (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError')) {
       mensajeError = 'No se encontró una cámara disponible en este dispositivo.';
-    } else if (e.name === 'NotReadableError' ||
-               e.name === 'TrackStartError') {
-      mensajeError =
-        'La cámara está siendo utilizada por otra aplicación. Ciérrala e inténtalo de nuevo.';
+    } else if (e && (e.name === 'NotReadableError' || e.name === 'TrackStartError')) {
+      mensajeError = 'La cámara está siendo utilizada por otra aplicación. Ciérrala e inténtalo de nuevo.';
     }
-
     mostrar(mensajeError, '', 6000);
 
     if (reader) {
@@ -642,7 +722,6 @@ async function iniciarLector() {
       reader = null;
     }
 
-    $('lector').innerHTML = '';
     $('btnIniciar').classList.remove('oculto');
     $('btnApagar').classList.add('oculto');
 
@@ -652,70 +731,40 @@ async function iniciarLector() {
   }
 }
 
-/* APAGAR COMPLETAMENTE EL LECTOR Y LIBERAR LA CÁMARA */
+/* Apaga la cámara y detiene el lector. Los enlaces ya encolados continúan procesándose. */
 async function apagarLector() {
-  if (apagando || iniciando) return;
+  if (iniciando) {
+    mostrar('La cámara se está activando. Espera un momento y vuelve a pulsar.');
+    return;
+  }
+  if (!reader && !activo) return;
 
-  apagando = true;
   activo = false;
-
-  clearTimeout(temporizadorLiberacion);
-  clearTimeout(temporizadorMensaje);
-
-  codigoEnLectura = '';
   linterna = false;
+  clearTimeout(temporizadorLiberacion);
+  codigoEnLectura = '';
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
+  try { if (reader) await reader.stop(); } catch (e) { console.warn(e); }
+  try { if (reader) reader.clear(); } catch (e) { console.warn(e); }
+
+  const video = $('lector').querySelector('video');
+  if (video && video.srcObject) {
+    try { video.srcObject.getTracks().forEach(track => track.stop()); } catch (_) {}
   }
 
-  $('estado').textContent = 'Apagando cámara…';
-  $('btnApagar').disabled = true;
-
-  try {
-    if (reader) {
-      try {
-        await reader.stop();
-      } catch (e) {
-        console.warn('La cámara ya estaba detenida.', e);
-      }
-
-      try {
-        reader.clear();
-      } catch (_) {}
-
-      reader = null;
-    }
-
-    /* Asegurar la liberación de todas las pistas de vídeo */
-    const video = $('lector').querySelector('video');
-
-    if (video && video.srcObject) {
-      video.srcObject.getTracks().forEach(pista => pista.stop());
-      video.srcObject = null;
-    }
-
-    $('lector').innerHTML = '';
-
-    $('resultado').style.display = 'none';
-    $('resultado').className = '';
-
-    $('btnLinterna').querySelector('.icono').textContent = '🔦';
-    $('btnApagar').classList.add('oculto');
-    $('btnIniciar').classList.remove('oculto');
-
-    $('estado').textContent = 'Lector apagado';
-    $('instruccion').textContent = 'Pulsa Iniciar escáner para comenzar';
-
-  } finally {
-    apagando = false;
-    $('btnApagar').disabled = false;
-  }
+  $('lector').innerHTML = '';
+  reader = null;
+  $('btnIniciar').classList.remove('oculto');
+  $('btnApagar').classList.add('oculto');
+  $('estado').textContent = 'Lector apagado';
+  $('btnLinterna').querySelector('.icono').textContent = '🔦';
+  mostrar(enlacesPendientes ? `Lector apagado. Quedan ${enlacesPendientes} enlace(s) por enviar.` : 'Lector apagado.');
 }
 
-/* Linterna */
+/* Control de la linterna. */
 async function alternarLinterna() {
-  if (!reader || !activo || apagando) {
+  if (!reader || !activo) {
     mostrar('Inicia primero el escáner.');
     return;
   }
@@ -732,23 +781,31 @@ async function alternarLinterna() {
     $('btnLinterna').querySelector('.icono').textContent =
       linterna ? '💡' : '🔦';
 
-    mostrar(linterna ? 'Linterna encendida' : 'Linterna apagada');
+    mostrar(
+      linterna ? 'Linterna encendida' : 'Linterna apagada'
+    );
 
   } catch (e) {
     linterna = false;
+
     $('btnLinterna').querySelector('.icono').textContent = '🔦';
+
     mostrar('La linterna no está disponible en este dispositivo.');
   }
 }
 
-/* Botones */
+/* Activación inicial mediante interacción del usuario. */
 $('btnIniciar').addEventListener('click', async () => {
-  if (activo || iniciando || apagando) return;
+  if (activo || iniciando) return;
 
-  hablar('Escáner activado. Puede comenzar a registrar asistencias.');
+  hablar(
+    'Escáner activado. Puede comenzar a registrar asistencias.'
+  );
+
   await iniciarLector();
 });
 
+/* Botón de escaneo. */
 $('botonQR').addEventListener('click', () => {
   if (activo) {
     mostrar('Apunta la cámara al código QR.');
@@ -757,35 +814,29 @@ $('botonQR').addEventListener('click', () => {
   }
 });
 
+/* Botón de linterna. */
 $('btnLinterna').addEventListener('click', alternarLinterna);
 $('btnApagar').addEventListener('click', apagarLector);
 
-/* Regreso a la pestaña */
+/* Recuperación al regresar a la pestaña del lector. */
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
 
   if (activo) {
-    $('estado').textContent = 'Cámara trasera activa';
-    $('instruccion').textContent = 'Coloca el código dentro del recuadro';
-  } else if (!iniciando && !apagando) {
-    $('estado').textContent = 'Pulsa Iniciar escáner para activar la cámara.';
+    actualizarEstadoCola();
+    $('instruccion').textContent =
+      'Coloca el código dentro del recuadro';
+  } else if (!iniciando) {
+    $('estado').textContent =
+      'Pulsa Iniciar escáner para activar la cámara.';
   }
 });
 
-/* Limpieza al abandonar la página */
+/* Limpiar temporizadores al abandonar la página. */
 window.addEventListener('pagehide', () => {
   clearTimeout(temporizadorMensaje);
   clearTimeout(temporizadorLiberacion);
-
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-  }
-
-  if (reader && activo) {
-    reader.stop().catch(() => {});
-  }
 });
 </script>
 </body>
 </html>
-
